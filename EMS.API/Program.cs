@@ -10,6 +10,16 @@ const string FrontendCorsPolicy = "Frontend";
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Cloud platforms such as Render assign a dynamic port via the PORT
+// environment variable and route to it on 0.0.0.0; Kestrel does not read
+// PORT on its own; without this the app binds to localhost:5000 and the
+// platform's proxy can never reach it (TLS succeeds, then the request hangs).
+var cloudPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(cloudPort) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{cloudPort}");
+}
+
 // Configuration
 builder.Services.Configure<DatabaseSettings>(
     builder.Configuration.GetSection(DatabaseSettings.SectionName));
