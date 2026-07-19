@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMS.Agent", "EMS.Agent\EMS.Agent.csproj", "{E95352B3-1F5F-4A42-B016-E694D9C7FB37}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMS.API", "EMS.API\EMS.API.csproj", "{F3E70CE7-463C-4025-A986-C4D8D7B62A9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMS.Shared", "EMS.Shared\EMS.Shared.csproj", "{BA5E6043-7243-4A3C-A09D-841140EBC3D7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "EMS.Tests", "EMS.Tests", "{E637C7FC-A0F5-4045-8DFC-8B177BE9567B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMS.Agent.Tests", "EMS.Tests\EMS.Agent.Tests\EMS.Agent.Tests.csproj", "{5FFBA410-5A93-4708-BA35-258A2549EEEE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMS.API.Tests", "EMS.Tests\EMS.API.Tests\EMS.API.Tests.csproj", "{C221BFAB-F873-4700-BAA7-FC34A2BBB312}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E95352B3-1F5F-4A42-B016-E694D9C7FB37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E95352B3-1F5F-4A42-B016-E694D9C7FB37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E95352B3-1F5F-4A42-B016-E694D9C7FB37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E95352B3-1F5F-4A42-B016-E694D9C7FB37}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3E70CE7-463C-4025-A986-C4D8D7B62A9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3E70CE7-463C-4025-A986-C4D8D7B62A9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3E70CE7-463C-4025-A986-C4D8D7B62A9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3E70CE7-463C-4025-A986-C4D8D7B62A9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA5E6043-7243-4A3C-A09D-841140EBC3D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA5E6043-7243-4A3C-A09D-841140EBC3D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA5E6043-7243-4A3C-A09D-841140EBC3D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA5E6043-7243-4A3C-A09D-841140EBC3D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5FFBA410-5A93-4708-BA35-258A2549EEEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5FFBA410-5A93-4708-BA35-258A2549EEEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5FFBA410-5A93-4708-BA35-258A2549EEEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5FFBA410-5A93-4708-BA35-258A2549EEEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C221BFAB-F873-4700-BAA7-FC34A2BBB312}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C221BFAB-F873-4700-BAA7-FC34A2BBB312}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C221BFAB-F873-4700-BAA7-FC34A2BBB312}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C221BFAB-F873-4700-BAA7-FC34A2BBB312}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5FFBA410-5A93-4708-BA35-258A2549EEEE} = {E637C7FC-A0F5-4045-8DFC-8B177BE9567B}
+		{C221BFAB-F873-4700-BAA7-FC34A2BBB312} = {E637C7FC-A0F5-4045-8DFC-8B177BE9567B}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/node_modules/
+EMS.Dashboard/
+EMS.Tests/
+installer/
+docs/
+.git/
+*.md
