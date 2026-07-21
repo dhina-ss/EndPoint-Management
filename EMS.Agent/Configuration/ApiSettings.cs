@@ -30,4 +30,13 @@ public class ApiSettings
 
     /// <summary>How often the agent collects and reports inventory, in minutes.</summary>
     public int PollingIntervalMinutes { get; set; } = 10;
+
+    /// <summary>Relative path of the app-usage report endpoint.</summary>
+    public string AppUsageEndpoint { get; set; } = "/api/devices/app-usage";
+
+    /// <summary>How often the agent samples the foreground application, in seconds.</summary>
+    public int AppUsageSampleIntervalSeconds { get; set; } = 20;
+
+    /// <summary>How often accumulated app usage is uploaded, in minutes.</summary>
+    public int AppUsageUploadIntervalMinutes { get; set; } = 10;
 }

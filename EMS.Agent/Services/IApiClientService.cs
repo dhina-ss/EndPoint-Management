@@ -14,4 +14,10 @@ public interface IApiClientService
     /// (without calling the server) when the agent has not registered yet.
     /// </summary>
     Task<bool> SendHeartbeatAsync(HeartbeatModel heartbeat, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a batch of per-application usage deltas. Returns false (without
+    /// calling the server) when the agent has not registered yet.
+    /// </summary>
+    Task<bool> SendAppUsageAsync(IReadOnlyList<AppUsageModel> usage, CancellationToken cancellationToken = default);
 }

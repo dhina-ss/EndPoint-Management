@@ -20,6 +20,10 @@ public static class ServiceCollectionExtensions
         // token must be visible to the heartbeat worker across scopes.
         services.AddSingleton<IDeviceTokenService, DeviceTokenService>();
 
+        // Singleton: the accumulator must survive across every sample tick
+        // until the worker flushes and uploads it.
+        services.AddSingleton<IAppUsageTrackerService, AppUsageTrackerService>();
+
         services.AddScoped<IDeviceCollectorService, DeviceCollectorService>();
         services.AddScoped<IHeartbeatService, HeartbeatService>();
 

@@ -22,6 +22,37 @@ namespace EMS.API.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplicationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("UsageDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "ApplicationName", "UsageDate")
+                        .IsUnique();
+
+                    b.ToTable("app_usage_records", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -166,6 +197,17 @@ namespace EMS.API.Data.Migrations
                     b.HasIndex("DeviceId", "HeartbeatTime");
 
                     b.ToTable("device_heartbeats", (string)null);
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
                 });
 
             modelBuilder.Entity("EMS.API.Entities.DeviceAuthentication", b =>

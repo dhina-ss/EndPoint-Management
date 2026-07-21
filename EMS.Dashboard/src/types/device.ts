@@ -33,3 +33,23 @@ export function isOnline(device: Device, now: number = Date.now()): boolean {
   }
   return now - Date.parse(device.lastHeartbeatTime) < ONLINE_THRESHOLD_MS;
 }
+
+/** Mirrors EMS.API AppUsageSummaryResponse (camelCase over the wire). */
+export interface AppUsageEntry {
+  applicationName: string;
+  durationSeconds: number;
+  usageDate: string;
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours === 0 && minutes === 0) {
+    return '< 1m';
+  }
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+  return `${hours}h ${minutes}m`;
+}

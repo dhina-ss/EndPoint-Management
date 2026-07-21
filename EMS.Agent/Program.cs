@@ -12,6 +12,7 @@ builder.Services.AddWindowsService(options =>
 builder.Services.AddAgentServices(builder.Configuration);
 builder.Services.AddHostedService<AgentWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
+builder.Services.AddHostedService<AppUsageWorker>();
 
 var host = builder.Build();
 host.Run();

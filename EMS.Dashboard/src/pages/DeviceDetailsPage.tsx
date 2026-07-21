@@ -11,14 +11,16 @@ import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import LinearProgress from '@mui/material/LinearProgress';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ComputerIcon from '@mui/icons-material/Computer';
 import LanIcon from '@mui/icons-material/Lan';
 import MemoryIcon from '@mui/icons-material/Memory';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import { fetchDevice } from '../api/devices';
-import { isOnline, type Device } from '../types/device';
+import AppsIcon from '@mui/icons-material/Apps';
+import { fetchAppUsage, fetchDevice } from '../api/devices';
+import { formatDuration, isOnline, type AppUsageEntry, type Device } from '../types/device';
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -74,6 +76,10 @@ export default function DeviceDetailsPage() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [appUsage, setAppUsage] = useState<AppUsageEntry[]>([]);
+  const [appUsageLoading, setAppUsageLoading] = useState(true);
+  const [appUsageError, setAppUsageError] = useState<string | null>(null);
+
   const loadDevice = useCallback(async () => {
     if (!id) {
       return;
@@ -91,9 +97,25 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadAppUsage = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    setAppUsageLoading(true);
+    setAppUsageError(null);
+    try {
+      setAppUsage(await fetchAppUsage(id));
+    } catch (err) {
+      setAppUsageError(err instanceof Error ? err.message : 'Failed to load application usage.');
+    } finally {
+      setAppUsageLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     void loadDevice();
-  }, [loadDevice]);
+    void loadAppUsage();
+  }, [loadDevice, loadAppUsage]);
 
   const online = device ? isOnline(device) : false;
 
@@ -133,7 +155,10 @@ export default function DeviceDetailsPage() {
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
-          onClick={() => void loadDevice()}
+          onClick={() => {
+            void loadDevice();
+            void loadAppUsage();
+          }}
           disabled={loading}
         >
           Refresh
@@ -192,6 +217,54 @@ export default function DeviceDetailsPage() {
             <DetailRow label="Last Inventory Update" value={formatDate(device.updatedDate)} />
           </DetailCard>
         </Box>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <AppsIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Application Usage — Today
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1 }} />
+
+            {appUsageError && <Alert severity="error">{appUsageError}</Alert>}
+
+            {appUsageLoading && !appUsageError && (
+              <Box textAlign="center" sx={{ py: 3 }}>
+                <CircularProgress size={24} />
+              </Box>
+            )}
+
+            {!appUsageLoading && !appUsageError && appUsage.length === 0 && (
+              <Typography color="text.secondary" sx={{ py: 1 }}>
+                No application usage recorded yet today.
+              </Typography>
+            )}
+
+            {!appUsageLoading && !appUsageError && appUsage.length > 0 && (
+              <Stack spacing={1.25} sx={{ pt: 0.5 }}>
+                {appUsage.map((entry) => {
+                  const topDuration = appUsage[0].durationSeconds || 1;
+                  const percentOfTop = Math.round((entry.durationSeconds / topDuration) * 100);
+                  return (
+                    <Box key={entry.applicationName}>
+                      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                        <Typography variant="body2">{entry.applicationName}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatDuration(entry.durationSeconds)}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress variant="determinate" value={percentOfTop} sx={{ height: 6, borderRadius: 3 }} />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
       )}
     </Container>
   );

@@ -129,6 +129,59 @@ public class ApiClientService : IApiClientService
         }
     }
 
+    public async Task<bool> SendAppUsageAsync(IReadOnlyList<AppUsageModel> usage, CancellationToken cancellationToken = default)
+    {
+        if (usage.Count == 0)
+        {
+            return true;
+        }
+
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            _logger.LogDebug("App usage upload skipped: agent has not registered yet.");
+            return false;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.AppUsageEndpoint)
+            {
+                Content = JsonContent.Create(new AppUsageReportPayload { UsageRecords = usage.ToList() })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("App usage upload rejected as unauthorized; waiting for the next registration to refresh the token.");
+                return false;
+            }
+
+            _logger.LogWarning("App usage upload failed with status {StatusCode}.", (int)response.StatusCode);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "App usage upload could not reach the EMS server at {BaseUrl}.", _httpClient.BaseAddress);
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("App usage upload timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
+            return false;
+        }
+    }
+
     /// <summary>
     /// Sends one registration request. Returns the final result, or null when
     /// the failure is transient and the attempt should be retried.

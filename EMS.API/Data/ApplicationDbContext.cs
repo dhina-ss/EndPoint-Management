@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<DeviceHeartbeat> DeviceHeartbeats => Set<DeviceHeartbeat>();
 
+    public DbSet<AppUsageRecord> AppUsageRecords => Set<AppUsageRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -94,6 +96,27 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(h => h.Device)
                 .WithMany()
                 .HasForeignKey(h => h.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AppUsageRecord>(entity =>
+        {
+            entity.ToTable("app_usage_records");
+
+            entity.HasKey(a => a.Id);
+
+            // One row per device/app/day; the service upserts into this
+            // instead of inserting a new row on every report.
+            entity.HasIndex(a => new { a.DeviceId, a.ApplicationName, a.UsageDate })
+                .IsUnique();
+
+            entity.Property(a => a.ApplicationName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.HasOne(a => a.Device)
+                .WithMany()
+                .HasForeignKey(a => a.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

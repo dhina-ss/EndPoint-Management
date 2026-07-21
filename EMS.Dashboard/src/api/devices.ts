@@ -1,4 +1,4 @@
-import type { Device } from '../types/device';
+import type { AppUsageEntry, Device } from '../types/device';
 
 // Empty base URL = same origin; the Vite dev server proxies /api to EMS.API.
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -47,4 +47,16 @@ export async function fetchDevice(id: string): Promise<Device | null> {
   }
 
   return (await response.json()) as Device;
+}
+
+export async function fetchAppUsage(id: string): Promise<AppUsageEntry[]> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/app-usage`, {
+    headers: credentialHeaders,
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as AppUsageEntry[];
 }

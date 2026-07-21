@@ -11,10 +11,12 @@ namespace EMS.API.Controllers;
 public class DevicesController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
+    private readonly IAppUsageService _appUsageService;
 
-    public DevicesController(IDeviceService deviceService)
+    public DevicesController(IDeviceService deviceService, IAppUsageService appUsageService)
     {
         _deviceService = deviceService;
+        _appUsageService = appUsageService;
     }
 
     /// <summary>
@@ -57,5 +59,23 @@ public class DevicesController : ControllerBase
     {
         var device = await _deviceService.GetByIdAsync(id, cancellationToken);
         return device is null ? NotFound() : Ok(device);
+    }
+
+    /// <summary>
+    /// Returns per-application foreground-usage totals for a device on a
+    /// given day (defaults to today, UTC).
+    /// </summary>
+    [HttpGet("{id:guid}/app-usage")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<AppUsageSummaryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<AppUsageSummaryResponse>>> GetAppUsage(
+        Guid id,
+        [FromQuery] DateOnly? date,
+        CancellationToken cancellationToken)
+    {
+        var usageDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var usage = await _appUsageService.GetUsageAsync(id, usageDate, cancellationToken);
+        return Ok(usage);
     }
 }
