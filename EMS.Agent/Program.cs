@@ -1,4 +1,5 @@
 using EMS.Agent.Extensions;
+using EMS.Agent.Logging;
 using EMS.Agent.Workers;
 
 // Foreground-window tracking cannot run inside the Windows Service: services
@@ -10,6 +11,16 @@ using EMS.Agent.Workers;
 if (args.Contains("--usage-tracker"))
 {
     var trackerBuilder = Host.CreateApplicationBuilder(args);
+
+    // Writing to the Windows Event Log from this non-elevated, per-user
+    // process has proven unreliable (silent write failures depending on the
+    // machine's Event Log ACLs), so this mode also logs to a plain file
+    // that does not depend on those permissions.
+    var logFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "EMS.Agent", "usage-tracker.log");
+    trackerBuilder.Logging.AddProvider(new FileLoggerProvider(logFilePath));
+
     trackerBuilder.Services.AddAgentServices(trackerBuilder.Configuration);
     trackerBuilder.Services.AddHostedService<AppUsageWorker>();
     trackerBuilder.Build().Run();
