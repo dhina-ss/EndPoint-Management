@@ -83,6 +83,32 @@ public class DeviceTokenServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetTokenAsync_AnotherProcessRotatesToken_PicksUpNewValue()
+    {
+        // Simulates the real deployment: the main service instance owns
+        // this DeviceTokenService and rotates the token via its own
+        // registration cycle, while a separate app-usage tracker process
+        // holds its own instance and must not keep using its stale copy.
+        using var trackerInstance = CreateService();
+        Assert.Equal("token-v1", await SeedTokenAsync("token-v1"));
+        Assert.Equal("token-v1", await trackerInstance.GetTokenAsync());
+
+        // The file's mtime resolution can be coarser than the test's clock;
+        // guarantee the rewritten file is observably newer.
+        await Task.Delay(50);
+        await SeedTokenAsync("token-v2");
+
+        Assert.Equal("token-v2", await trackerInstance.GetTokenAsync());
+    }
+
+    private async Task<string> SeedTokenAsync(string token)
+    {
+        using var writer = CreateService();
+        await writer.SaveTokenAsync(TestDeviceId, token);
+        return token;
+    }
+
+    [Fact]
     public async Task GetTokenAsync_CorruptFile_ReturnsNull()
     {
         Directory.CreateDirectory(_directory);

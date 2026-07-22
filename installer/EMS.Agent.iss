@@ -39,6 +39,9 @@ UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
+; Helper used at install time only (see RegisterUsageTrackerTask below);
+; not part of the installed application.
+Source: "ReencodeUtf16.ps1"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "{#PublishDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; Keep an existing (possibly customized) config on upgrade.
 Source: "{#PublishDir}\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
@@ -75,7 +78,8 @@ Filename: "{sys}\sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden
 procedure RegisterUsageTrackerTask();
 var
   ResultCode: Integer;
-  CurrentUser, TaskAction, CreateParams: string;
+  CurrentUser, CurrentDomain, FullUserId, TaskCommand, XmlContent: string;
+  XmlPathAnsi, XmlPath, ReencodeScript: string;
 begin
   CurrentUser := GetEnv('USERNAME');
   if CurrentUser = '' then
@@ -84,12 +88,67 @@ begin
     Exit;
   end;
 
-  TaskAction := '"' + ExpandConstant('{app}\{#MyAppExeName}') + '" --usage-tracker';
-  CreateParams :=
-    '/Create /TN "{#MyUsageTaskName}" /TR "' + TaskAction + '" ' +
-    '/SC ONLOGON /RU "' + CurrentUser + '" /IT /RL LIMITED /F';
+  CurrentDomain := GetEnv('USERDOMAIN');
+  if CurrentDomain <> '' then
+    FullUserId := CurrentDomain + '\' + CurrentUser
+  else
+    FullUserId := CurrentUser;
 
-  if Exec(ExpandConstant('{sys}\schtasks.exe'), CreateParams, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  // Built as a Scheduled Task XML definition rather than the flat
+  // "schtasks /TR <string>" form: /TR requires the caller to correctly
+  // nest quotes around a path that itself contains spaces, which is
+  // fragile and shell-dependent. XML's <Command>/<Arguments> are separate
+  // elements, so the path never needs quoting at all.
+  TaskCommand := ExpandConstant('{app}\{#MyAppExeName}');
+  XmlContent :=
+    '<?xml version="1.0" encoding="UTF-16"?>' + #13#10 +
+    '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">' + #13#10 +
+    '  <Triggers>' + #13#10 +
+    '    <LogonTrigger>' + #13#10 +
+    '      <Enabled>true</Enabled>' + #13#10 +
+    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
+    '    </LogonTrigger>' + #13#10 +
+    '  </Triggers>' + #13#10 +
+    '  <Principals>' + #13#10 +
+    '    <Principal id="Author">' + #13#10 +
+    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
+    '      <LogonType>InteractiveToken</LogonType>' + #13#10 +
+    '      <RunLevel>LeastPrivilege</RunLevel>' + #13#10 +
+    '    </Principal>' + #13#10 +
+    '  </Principals>' + #13#10 +
+    '  <Settings>' + #13#10 +
+    '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>' + #13#10 +
+    '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>' + #13#10 +
+    '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>' + #13#10 +
+    '    <StartWhenAvailable>true</StartWhenAvailable>' + #13#10 +
+    '    <AllowStartOnDemand>true</AllowStartOnDemand>' + #13#10 +
+    '    <Enabled>true</Enabled>' + #13#10 +
+    '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>' + #13#10 +
+    '  </Settings>' + #13#10 +
+    '  <Actions Context="Author">' + #13#10 +
+    '    <Exec>' + #13#10 +
+    '      <Command>' + TaskCommand + '</Command>' + #13#10 +
+    '      <Arguments>--usage-tracker</Arguments>' + #13#10 +
+    '    </Exec>' + #13#10 +
+    '  </Actions>' + #13#10 +
+    '</Task>';
+
+  // Pascal Script can only write ANSI/UTF-8 directly; schtasks needs real
+  // UTF-16, so write the ANSI draft first, then re-encode it via the
+  // bundled helper script before handing it to schtasks.
+  XmlPathAnsi := ExpandConstant('{tmp}\EMSUsageTrackerTask.ansi.xml');
+  XmlPath := ExpandConstant('{tmp}\EMSUsageTrackerTask.xml');
+  SaveStringToFile(XmlPathAnsi, XmlContent, False);
+
+  ExtractTemporaryFile('ReencodeUtf16.ps1');
+  ReencodeScript := ExpandConstant('{tmp}\ReencodeUtf16.ps1');
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ReencodeScript + '" "' + XmlPathAnsi + '" "' + XmlPath + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  if Exec(ExpandConstant('{sys}\schtasks.exe'),
+       '/Create /TN "{#MyUsageTaskName}" /XML "' + XmlPath + '" /F',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
     if ResultCode = 0 then
     begin
@@ -99,7 +158,7 @@ begin
         SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end
     else
-      Log(Format('schtasks /Create for the usage-tracker task exited with code %d.', [ResultCode]));
+      Log(Format('schtasks /Create (XML) for the usage-tracker task exited with code %d.', [ResultCode]));
   end;
 end;
 

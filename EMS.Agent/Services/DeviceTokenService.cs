@@ -7,6 +7,14 @@ namespace EMS.Agent.Services;
 /// The server rotates the token on every registration, so the file always
 /// holds the latest issued credential; a write failure degrades gracefully
 /// to in-memory (heartbeats keep working until the next restart).
+///
+/// More than one process can read this file concurrently: the main
+/// service (AgentWorker/HeartbeatWorker) is the only one that ever rotates
+/// the token, but the app-usage tracker (a separate per-user process,
+/// launched by a Scheduled Task - see Workers/AppUsageWorker.cs) only ever
+/// reads it. Caching forever would let the tracker's copy silently go
+/// stale the moment the service rotates, so every read re-checks the
+/// file's last-write time and reloads when another process has updated it.
 /// </summary>
 public class DeviceTokenService : IDeviceTokenService, IDisposable
 {
@@ -19,6 +27,7 @@ public class DeviceTokenService : IDeviceTokenService, IDisposable
 
     private volatile bool _loaded;
     private string? _cachedToken;
+    private DateTime _cachedFileWriteTimeUtc;
 
     public DeviceTokenService(IDeviceIdService deviceIdService, ILogger<DeviceTokenService> logger)
         : this(deviceIdService, logger, DefaultFilePath())
@@ -35,7 +44,7 @@ public class DeviceTokenService : IDeviceTokenService, IDisposable
 
     public async Task<string?> GetTokenAsync(CancellationToken cancellationToken = default)
     {
-        if (_loaded)
+        if (_loaded && !FileChangedSinceLoad())
         {
             return _cachedToken;
         }
@@ -43,9 +52,10 @@ public class DeviceTokenService : IDeviceTokenService, IDisposable
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            if (!_loaded)
+            if (!_loaded || FileChangedSinceLoad())
             {
                 _cachedToken = await TryReadAsync(cancellationToken);
+                _cachedFileWriteTimeUtc = GetFileWriteTimeUtcOrDefault();
                 _loaded = true;
             }
 
@@ -66,10 +76,26 @@ public class DeviceTokenService : IDeviceTokenService, IDisposable
             _loaded = true;
 
             await TryPersistAsync(deviceId, token, cancellationToken);
+            _cachedFileWriteTimeUtc = GetFileWriteTimeUtcOrDefault();
         }
         finally
         {
             _lock.Release();
+        }
+    }
+
+    /// <summary>Cheap stat check; avoids re-reading and re-parsing the file on every call.</summary>
+    private bool FileChangedSinceLoad() => GetFileWriteTimeUtcOrDefault() != _cachedFileWriteTimeUtc;
+
+    private DateTime GetFileWriteTimeUtcOrDefault()
+    {
+        try
+        {
+            return File.Exists(_filePath) ? File.GetLastWriteTimeUtc(_filePath) : DateTime.MinValue;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return DateTime.MinValue;
         }
     }
 
