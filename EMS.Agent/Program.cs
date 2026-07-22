@@ -1,4 +1,5 @@
 using EMS.Agent.Extensions;
+using EMS.Agent.Helpers;
 using EMS.Agent.Logging;
 using EMS.Agent.Workers;
 
@@ -10,6 +11,12 @@ using EMS.Agent.Workers;
 // executes inside the same session as the logged-in user.
 if (args.Contains("--usage-tracker"))
 {
+    // The Worker SDK builds a console-subsystem exe; unlike the Service
+    // Control Manager, Task Scheduler leaves that console window visible on
+    // the user's desktop. This mode logs to a file (below), not the
+    // console, so detach it immediately - nothing is lost.
+    ConsoleWindowHelper.DetachConsole();
+
     var trackerBuilder = Host.CreateApplicationBuilder(args);
 
     // Writing to the Windows Event Log from this non-elevated, per-user
