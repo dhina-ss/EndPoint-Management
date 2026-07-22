@@ -38,5 +38,5 @@ public class ApiSettings
     public int AppUsageSampleIntervalSeconds { get; set; } = 20;
 
     /// <summary>How often accumulated app usage is uploaded, in minutes.</summary>
-    public int AppUsageUploadIntervalMinutes { get; set; } = 10;
+    public int AppUsageUploadIntervalMinutes { get; set; } = 5;
 }
