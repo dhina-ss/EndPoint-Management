@@ -125,6 +125,11 @@ namespace EMS.API.Data.Migrations
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("UsbBlockingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Username")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");

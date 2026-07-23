@@ -62,6 +62,24 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
+    /// Enables or disables USB mass-storage blocking for a device. Takes
+    /// effect on the device's next heartbeat, not instantly.
+    /// </summary>
+    [HttpPut("{id:guid}/usb-blocking")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceResponse>> SetUsbBlocking(
+        Guid id,
+        [FromBody] UsbBlockingUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var device = await _deviceService.SetUsbBlockingAsync(id, request.Enabled, cancellationToken);
+        return device is null ? NotFound() : Ok(device);
+    }
+
+    /// <summary>
     /// Returns per-application foreground-usage totals for a device on a
     /// given day (defaults to today, UTC).
     /// </summary>

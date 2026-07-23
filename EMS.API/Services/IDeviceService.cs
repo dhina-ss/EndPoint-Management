@@ -9,4 +9,7 @@ public interface IDeviceService
     Task<IReadOnlyList<DeviceResponse>> GetAllAsync(CancellationToken cancellationToken = default);
 
     Task<DeviceResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates the device's USB mass-storage blocking policy. Returns null if the device does not exist.</summary>
+    Task<DeviceResponse?> SetUsbBlockingAsync(Guid id, bool enabled, CancellationToken cancellationToken = default);
 }

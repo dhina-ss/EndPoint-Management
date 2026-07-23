@@ -58,6 +58,9 @@ public class ApplicationDbContext : DbContext
             // so it must not be normalized to UTC by the timestamptz mapping.
             entity.Property(d => d.LastBootTime)
                 .HasColumnType("timestamp without time zone");
+
+            entity.Property(d => d.UsbBlockingEnabled)
+                .HasDefaultValue(false);
         });
 
         modelBuilder.Entity<DeviceAuthentication>(entity =>

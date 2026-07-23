@@ -42,4 +42,6 @@ public class DeviceResponse
     public DateTime LastSeen { get; set; }
 
     public DateTime? LastHeartbeatTime { get; set; }
+
+    public bool UsbBlockingEnabled { get; set; }
 }

@@ -59,7 +59,8 @@ public class HeartbeatService : IHeartbeatService
         {
             Success = true,
             Message = "Heartbeat received",
-            ServerTime = utcNow
+            ServerTime = utcNow,
+            UsbBlockingEnabled = device.UsbBlockingEnabled
         };
     }
 }

@@ -8,6 +8,9 @@ public interface IDeviceRepository
 
     Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked variant of <see cref="GetByIdAsync"/>, for callers that need to mutate and save.</summary>
+    Task<Device?> GetTrackedByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Device>> GetAllAsync(CancellationToken cancellationToken = default);
 
     Task AddAsync(Device device, CancellationToken cancellationToken = default);

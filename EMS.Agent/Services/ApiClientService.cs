@@ -77,13 +77,13 @@ public class ApiClientService : IApiClientService
         return false;
     }
 
-    public async Task<bool> SendHeartbeatAsync(HeartbeatModel heartbeat, CancellationToken cancellationToken = default)
+    public async Task<HeartbeatOutcome> SendHeartbeatAsync(HeartbeatModel heartbeat, CancellationToken cancellationToken = default)
     {
         var token = await _tokenService.GetTokenAsync(cancellationToken);
         if (token is null)
         {
             _logger.LogDebug("Heartbeat skipped: agent has not registered yet.");
-            return false;
+            return HeartbeatOutcome.Failed;
         }
 
         var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
@@ -103,7 +103,7 @@ public class ApiClientService : IApiClientService
             {
                 var result = await response.Content.ReadFromJsonAsync<HeartbeatResult>(cancellationToken);
                 _logger.LogDebug("Heartbeat acknowledged. Server time: {ServerTime}", result?.ServerTime);
-                return true;
+                return new HeartbeatOutcome(true, result?.UsbBlockingEnabled ?? false);
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -111,21 +111,21 @@ public class ApiClientService : IApiClientService
                 // Token rotated away (e.g. another registration raced us);
                 // the next registration cycle stores a fresh one.
                 _logger.LogWarning("Heartbeat rejected as unauthorized; waiting for the next registration to refresh the token.");
-                return false;
+                return HeartbeatOutcome.Failed;
             }
 
             _logger.LogWarning("Heartbeat failed with status {StatusCode}.", (int)response.StatusCode);
-            return false;
+            return HeartbeatOutcome.Failed;
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Heartbeat could not reach the EMS server at {BaseUrl}.", _httpClient.BaseAddress);
-            return false;
+            return HeartbeatOutcome.Failed;
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Heartbeat timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
-            return false;
+            return HeartbeatOutcome.Failed;
         }
     }
 
@@ -256,5 +256,5 @@ public class ApiClientService : IApiClientService
     private sealed record RegistrationResult(bool Success, string? Message, string? DeviceId, string? Token);
 
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
-    private sealed record HeartbeatResult(bool Success, string? Message, DateTime? ServerTime);
+    private sealed record HeartbeatResult(bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled);
 }

@@ -133,7 +133,7 @@ public class ApiClientServiceTests
         var handler = new SequenceHandler(HeartbeatSuccess());
         var result = await CreateService(handler).SendHeartbeatAsync(new HeartbeatModel());
 
-        Assert.False(result);
+        Assert.False(result.Success);
         Assert.Equal(0, handler.CallCount);
     }
 
@@ -145,7 +145,7 @@ public class ApiClientServiceTests
 
         var result = await CreateService(handler).SendHeartbeatAsync(new HeartbeatModel());
 
-        Assert.True(result);
+        Assert.True(result.Success);
         Assert.Equal(1, handler.CallCount);
 
         var request = Assert.Single(handler.Requests);
@@ -162,8 +162,21 @@ public class ApiClientServiceTests
 
         var result = await CreateService(handler).SendHeartbeatAsync(new HeartbeatModel());
 
-        Assert.False(result);
+        Assert.False(result.Success);
         Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task SendHeartbeatAsync_ReturnsUsbBlockingStateFromServer()
+    {
+        await _tokenService.SaveTokenAsync(TestDeviceId, "token-abc");
+        var handler = new SequenceHandler(JsonResponse(HttpStatusCode.OK,
+            """{"success":true,"message":"Heartbeat received","serverTime":"2026-07-19T10:30:00Z","usbBlockingEnabled":true}"""));
+
+        var result = await CreateService(handler).SendHeartbeatAsync(new HeartbeatModel());
+
+        Assert.True(result.Success);
+        Assert.True(result.UsbBlockingEnabled);
     }
 
     private sealed class InMemoryTokenService : IDeviceTokenService

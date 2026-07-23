@@ -45,6 +45,14 @@ public class Device
     /// <summary>Time of the most recent heartbeat; null until the first one arrives.</summary>
     public DateTime? LastHeartbeatTime { get; set; }
 
+    /// <summary>
+    /// When true, the agent disables USB mass-storage (flash drives, external
+    /// disks) on this device. Applied on the device's next heartbeat, not
+    /// instantly. Other USB device classes (keyboard, mouse, etc.) are
+    /// unaffected.
+    /// </summary>
+    public bool UsbBlockingEnabled { get; set; }
+
     /// <summary>The device's API credential; created at first registration.</summary>
     public DeviceAuthentication? Authentication { get; set; }
 }

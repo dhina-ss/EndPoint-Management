@@ -12,6 +12,7 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
+import Switch from '@mui/material/Switch';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ComputerIcon from '@mui/icons-material/Computer';
@@ -19,7 +20,8 @@ import LanIcon from '@mui/icons-material/Lan';
 import MemoryIcon from '@mui/icons-material/Memory';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AppsIcon from '@mui/icons-material/Apps';
-import { fetchAppUsage, fetchDevice } from '../api/devices';
+import UsbIcon from '@mui/icons-material/Usb';
+import { fetchAppUsage, fetchDevice, setUsbBlocking } from '../api/devices';
 import { formatDuration, isOnline, type AppUsageEntry, type Device } from '../types/device';
 
 function formatDate(iso: string | null): string {
@@ -80,6 +82,9 @@ export default function DeviceDetailsPage() {
   const [appUsageLoading, setAppUsageLoading] = useState(true);
   const [appUsageError, setAppUsageError] = useState<string | null>(null);
 
+  const [usbBlockingPending, setUsbBlockingPending] = useState(false);
+  const [usbBlockingError, setUsbBlockingError] = useState<string | null>(null);
+
   const loadDevice = useCallback(async () => {
     if (!id) {
       return;
@@ -116,6 +121,21 @@ export default function DeviceDetailsPage() {
     void loadDevice();
     void loadAppUsage();
   }, [loadDevice, loadAppUsage]);
+
+  const handleToggleUsbBlocking = async (enabled: boolean) => {
+    if (!id) {
+      return;
+    }
+    setUsbBlockingPending(true);
+    setUsbBlockingError(null);
+    try {
+      setDevice(await setUsbBlocking(id, enabled));
+    } catch (err) {
+      setUsbBlockingError(err instanceof Error ? err.message : 'Failed to update USB blocking.');
+    } finally {
+      setUsbBlockingPending(false);
+    }
+  };
 
   const online = device ? isOnline(device) : false;
 
@@ -217,6 +237,45 @@ export default function DeviceDetailsPage() {
             <DetailRow label="Last Inventory Update" value={formatDate(device.updatedDate)} />
           </DetailCard>
         </Box>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <UsbIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                USB Storage Blocking
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1 }} />
+
+            {usbBlockingError && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {usbBlockingError}
+              </Alert>
+            )}
+
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box>
+                <Typography variant="body2">
+                  {device.usbBlockingEnabled ? 'USB storage is blocked' : 'USB storage is allowed'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Blocks flash drives and external disks on this device. Other USB devices (keyboard,
+                  mouse, etc.) are unaffected. Applies within one heartbeat interval once the device is
+                  online.
+                </Typography>
+              </Box>
+              <Switch
+                checked={device.usbBlockingEnabled}
+                disabled={usbBlockingPending}
+                onChange={(event) => void handleToggleUsbBlocking(event.target.checked)}
+                inputProps={{ 'aria-label': 'Toggle USB storage blocking' }}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
       )}
 
       {device && !loading && (

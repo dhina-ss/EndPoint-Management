@@ -26,7 +26,14 @@ public class HeartbeatService : IHeartbeatService
     public async Task<bool> SendHeartbeatAsync(CancellationToken cancellationToken = default)
     {
         var heartbeat = BuildHeartbeat();
-        return await _apiClient.SendHeartbeatAsync(heartbeat, cancellationToken);
+        var outcome = await _apiClient.SendHeartbeatAsync(heartbeat, cancellationToken);
+
+        if (outcome.Success)
+        {
+            UsbBlockingHelper.ApplyPolicy(outcome.UsbBlockingEnabled, _logger);
+        }
+
+        return outcome.Success;
     }
 
     private HeartbeatModel BuildHeartbeat()
