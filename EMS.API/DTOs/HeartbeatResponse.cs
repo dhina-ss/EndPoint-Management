@@ -15,4 +15,11 @@ public class HeartbeatResponse
     /// effect within one heartbeat interval.
     /// </summary>
     public bool UsbBlockingEnabled { get; set; }
+
+    /// <summary>
+    /// Device-specific domains to block, on top of the agent's always-on
+    /// default phishing/malware list. The agent merges the two and writes
+    /// them to the hosts file after each heartbeat.
+    /// </summary>
+    public IReadOnlyList<string> BlockedWebsites { get; set; } = [];
 }

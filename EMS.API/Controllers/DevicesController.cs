@@ -12,11 +12,16 @@ public class DevicesController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
     private readonly IAppUsageService _appUsageService;
+    private readonly IBlockedWebsiteService _blockedWebsiteService;
 
-    public DevicesController(IDeviceService deviceService, IAppUsageService appUsageService)
+    public DevicesController(
+        IDeviceService deviceService,
+        IAppUsageService appUsageService,
+        IBlockedWebsiteService blockedWebsiteService)
     {
         _deviceService = deviceService;
         _appUsageService = appUsageService;
+        _blockedWebsiteService = blockedWebsiteService;
     }
 
     /// <summary>
@@ -95,5 +100,63 @@ public class DevicesController : ControllerBase
         var usageDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var usage = await _appUsageService.GetUsageAsync(id, usageDate, cancellationToken);
         return Ok(usage);
+    }
+
+    /// <summary>
+    /// Lists the device-specific blocked domains (in addition to the agent's
+    /// always-on default phishing/malware list).
+    /// </summary>
+    [HttpGet("{id:guid}/blocked-websites")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<BlockedWebsiteResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<BlockedWebsiteResponse>>> GetBlockedWebsites(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var blocks = await _blockedWebsiteService.GetForDeviceAsync(id, cancellationToken);
+        return blocks is null ? NotFound() : Ok(blocks);
+    }
+
+    /// <summary>
+    /// Adds a domain to the device's block list. Takes effect on the device's
+    /// next heartbeat.
+    /// </summary>
+    [HttpPost("{id:guid}/blocked-websites")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(BlockedWebsiteResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BlockedWebsiteResponse>> AddBlockedWebsite(
+        Guid id,
+        [FromBody] AddBlockedWebsiteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _blockedWebsiteService.AddAsync(id, request.Domain, cancellationToken);
+
+        return result.Outcome switch
+        {
+            AddBlockedWebsiteOutcome.Created => CreatedAtAction(
+                nameof(GetBlockedWebsites), new { id }, result.Created),
+            AddBlockedWebsiteOutcome.DeviceNotFound => NotFound(),
+            AddBlockedWebsiteOutcome.InvalidDomain => BadRequest(new { message = result.Error }),
+            AddBlockedWebsiteOutcome.Duplicate => Conflict(new { message = result.Error }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    /// <summary>Removes a domain from the device's block list.</summary>
+    [HttpDelete("{id:guid}/blocked-websites/{blockId:guid}")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RemoveBlockedWebsite(
+        Guid id, Guid blockId, CancellationToken cancellationToken)
+    {
+        var removed = await _blockedWebsiteService.RemoveAsync(id, blockId, cancellationToken);
+        return removed ? NoContent() : NotFound();
     }
 }

@@ -31,6 +31,13 @@ public class HeartbeatService : IHeartbeatService
         if (outcome.Success)
         {
             UsbBlockingHelper.ApplyPolicy(outcome.UsbBlockingEnabled, _logger);
+
+            // Always-on default phishing/malware list plus this device's
+            // custom domains from the server.
+            var domainsToBlock = PhishingBlocklist.Domains
+                .Concat(outcome.BlockedWebsites)
+                .ToList();
+            HostsFileHelper.ApplyBlocklist(domainsToBlock, _logger);
         }
 
         return outcome.Success;

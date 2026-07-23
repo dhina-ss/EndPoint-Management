@@ -18,6 +18,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<AppUsageRecord> AppUsageRecords => Set<AppUsageRecord>();
 
+    public DbSet<BlockedWebsite> BlockedWebsites => Set<BlockedWebsite>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -120,6 +122,26 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(a => a.Device)
                 .WithMany()
                 .HasForeignKey(a => a.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BlockedWebsite>(entity =>
+        {
+            entity.ToTable("blocked_websites");
+
+            entity.HasKey(b => b.Id);
+
+            // A domain can appear at most once per device.
+            entity.HasIndex(b => new { b.DeviceId, b.Domain })
+                .IsUnique();
+
+            entity.Property(b => b.Domain)
+                .HasMaxLength(253)
+                .IsRequired();
+
+            entity.HasOne(b => b.Device)
+                .WithMany()
+                .HasForeignKey(b => b.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

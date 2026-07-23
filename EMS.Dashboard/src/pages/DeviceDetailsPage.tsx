@@ -13,6 +13,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ComputerIcon from '@mui/icons-material/Computer';
@@ -21,8 +23,25 @@ import MemoryIcon from '@mui/icons-material/Memory';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AppsIcon from '@mui/icons-material/Apps';
 import UsbIcon from '@mui/icons-material/Usb';
-import { fetchAppUsage, fetchDevice, setUsbBlocking } from '../api/devices';
-import { formatDuration, isOnline, type AppUsageEntry, type Device } from '../types/device';
+import PublicOffIcon from '@mui/icons-material/PublicOff';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import AddIcon from '@mui/icons-material/Add';
+import ShieldIcon from '@mui/icons-material/Shield';
+import {
+  addBlockedWebsite,
+  fetchAppUsage,
+  fetchBlockedWebsites,
+  fetchDevice,
+  removeBlockedWebsite,
+  setUsbBlocking,
+} from '../api/devices';
+import {
+  formatDuration,
+  isOnline,
+  type AppUsageEntry,
+  type BlockedWebsite,
+  type Device,
+} from '../types/device';
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -85,6 +104,11 @@ export default function DeviceDetailsPage() {
   const [usbBlockingPending, setUsbBlockingPending] = useState(false);
   const [usbBlockingError, setUsbBlockingError] = useState<string | null>(null);
 
+  const [blockedSites, setBlockedSites] = useState<BlockedWebsite[]>([]);
+  const [newDomain, setNewDomain] = useState('');
+  const [blockPending, setBlockPending] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
+
   const loadDevice = useCallback(async () => {
     if (!id) {
       return;
@@ -117,10 +141,52 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadBlockedSites = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setBlockedSites(await fetchBlockedWebsites(id));
+    } catch (err) {
+      setBlockError(err instanceof Error ? err.message : 'Failed to load blocked websites.');
+    }
+  }, [id]);
+
   useEffect(() => {
     void loadDevice();
     void loadAppUsage();
-  }, [loadDevice, loadAppUsage]);
+    void loadBlockedSites();
+  }, [loadDevice, loadAppUsage, loadBlockedSites]);
+
+  const handleAddBlockedSite = async () => {
+    if (!id || !newDomain.trim()) {
+      return;
+    }
+    setBlockPending(true);
+    setBlockError(null);
+    try {
+      const added = await addBlockedWebsite(id, newDomain.trim());
+      setBlockedSites((prev) => [...prev, added].sort((a, b) => a.domain.localeCompare(b.domain)));
+      setNewDomain('');
+    } catch (err) {
+      setBlockError(err instanceof Error ? err.message : 'Failed to add the domain.');
+    } finally {
+      setBlockPending(false);
+    }
+  };
+
+  const handleRemoveBlockedSite = async (blockId: string) => {
+    if (!id) {
+      return;
+    }
+    setBlockError(null);
+    try {
+      await removeBlockedWebsite(id, blockId);
+      setBlockedSites((prev) => prev.filter((b) => b.id !== blockId));
+    } catch (err) {
+      setBlockError(err instanceof Error ? err.message : 'Failed to remove the domain.');
+    }
+  };
 
   const handleToggleUsbBlocking = async (enabled: boolean) => {
     if (!id) {
@@ -274,6 +340,86 @@ export default function DeviceDetailsPage() {
                 inputProps={{ 'aria-label': 'Toggle USB storage blocking' }}
               />
             </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <PublicOffIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Website Blocking
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1.5 }} />
+
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+              <ShieldIcon fontSize="small" color="success" />
+              <Typography variant="body2" color="text.secondary">
+                Default phishing &amp; malware protection is always on for this device, on any network.
+                Add domains below to block them on this device specifically.
+              </Typography>
+            </Stack>
+
+            {blockError && (
+              <Alert severity="error" sx={{ mb: 1.5 }}>
+                {blockError}
+              </Alert>
+            )}
+
+            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="example.com"
+                value={newDomain}
+                onChange={(event) => setNewDomain(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void handleAddBlockedSite();
+                  }
+                }}
+                disabled={blockPending}
+                inputProps={{ 'aria-label': 'Domain to block' }}
+              />
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => void handleAddBlockedSite()}
+                disabled={blockPending || !newDomain.trim()}
+              >
+                Block
+              </Button>
+            </Stack>
+
+            {blockedSites.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No custom domains blocked on this device.
+              </Typography>
+            ) : (
+              <Stack spacing={0.5}>
+                {blockedSites.map((site) => (
+                  <Stack
+                    key={site.id}
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ py: 0.25 }}
+                  >
+                    <Typography variant="body2">{site.domain}</Typography>
+                    <IconButton
+                      size="small"
+                      aria-label={`Unblock ${site.domain}`}
+                      onClick={() => void handleRemoveBlockedSite(site.id)}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
           </CardContent>
         </Card>
       )}

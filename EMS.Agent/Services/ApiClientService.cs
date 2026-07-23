@@ -103,7 +103,10 @@ public class ApiClientService : IApiClientService
             {
                 var result = await response.Content.ReadFromJsonAsync<HeartbeatResult>(cancellationToken);
                 _logger.LogDebug("Heartbeat acknowledged. Server time: {ServerTime}", result?.ServerTime);
-                return new HeartbeatOutcome(true, result?.UsbBlockingEnabled ?? false);
+                return new HeartbeatOutcome(
+                    true,
+                    result?.UsbBlockingEnabled ?? false,
+                    result?.BlockedWebsites ?? Array.Empty<string>());
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -256,5 +259,7 @@ public class ApiClientService : IApiClientService
     private sealed record RegistrationResult(bool Success, string? Message, string? DeviceId, string? Token);
 
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
-    private sealed record HeartbeatResult(bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled);
+    private sealed record HeartbeatResult(
+        bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
+        IReadOnlyList<string>? BlockedWebsites);
 }

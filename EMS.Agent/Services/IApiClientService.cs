@@ -24,10 +24,12 @@ public interface IApiClientService
 }
 
 /// <summary>
-/// Result of a heartbeat attempt. <see cref="UsbBlockingEnabled"/> is only
-/// meaningful when <see cref="Success"/> is true.
+/// Result of a heartbeat attempt. <see cref="UsbBlockingEnabled"/> and
+/// <see cref="BlockedWebsites"/> are only meaningful when
+/// <see cref="Success"/> is true.
 /// </summary>
-public sealed record HeartbeatOutcome(bool Success, bool UsbBlockingEnabled)
+public sealed record HeartbeatOutcome(
+    bool Success, bool UsbBlockingEnabled, IReadOnlyList<string> BlockedWebsites)
 {
-    public static readonly HeartbeatOutcome Failed = new(false, false);
+    public static readonly HeartbeatOutcome Failed = new(false, false, Array.Empty<string>());
 }

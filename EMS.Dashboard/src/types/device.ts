@@ -42,6 +42,13 @@ export interface AppUsageEntry {
   usageDate: string;
 }
 
+/** Mirrors EMS.API BlockedWebsiteResponse. */
+export interface BlockedWebsite {
+  id: string;
+  domain: string;
+  createdDate: string;
+}
+
 export function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

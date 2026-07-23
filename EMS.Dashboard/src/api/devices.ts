@@ -1,4 +1,4 @@
-import type { AppUsageEntry, Device } from '../types/device';
+import type { AppUsageEntry, BlockedWebsite, Device } from '../types/device';
 
 // Empty base URL = same origin; the Vite dev server proxies /api to EMS.API.
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -76,4 +76,52 @@ export async function fetchAppUsage(id: string): Promise<AppUsageEntry[]> {
   }
 
   return (await response.json()) as AppUsageEntry[];
+}
+
+export async function fetchBlockedWebsites(id: string): Promise<BlockedWebsite[]> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-websites`, {
+    headers: credentialHeaders,
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as BlockedWebsite[];
+}
+
+export async function addBlockedWebsite(id: string, domain: string): Promise<BlockedWebsite> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-websites`, {
+    method: 'POST',
+    headers: {
+      ...credentialHeaders,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ domain }),
+  });
+
+  if (!response.ok) {
+    // 400 (invalid) and 409 (duplicate) carry a { message } body worth surfacing.
+    if (response.status === 400 || response.status === 409) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? `The domain could not be added (${response.status}).`);
+    }
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as BlockedWebsite;
+}
+
+export async function removeBlockedWebsite(id: string, blockId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-websites/${encodeURIComponent(blockId)}`,
+    {
+      method: 'DELETE',
+      headers: credentialHeaders,
+    },
+  );
+
+  if (!response.ok && response.status !== 404) {
+    throwForStatus(response.status);
+  }
 }

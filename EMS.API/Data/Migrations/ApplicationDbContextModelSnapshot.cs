@@ -53,6 +53,31 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("app_usage_records", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.BlockedWebsite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "Domain")
+                        .IsUnique();
+
+                    b.ToTable("blocked_websites", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -205,6 +230,17 @@ namespace EMS.API.Data.Migrations
                 });
 
             modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.BlockedWebsite", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()

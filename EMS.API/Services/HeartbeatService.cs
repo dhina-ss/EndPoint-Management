@@ -8,15 +8,18 @@ public class HeartbeatService : IHeartbeatService
 {
     private readonly IDeviceRepository _deviceRepository;
     private readonly IHeartbeatRepository _heartbeatRepository;
+    private readonly IBlockedWebsiteRepository _blockedWebsiteRepository;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
         IDeviceRepository deviceRepository,
         IHeartbeatRepository heartbeatRepository,
+        IBlockedWebsiteRepository blockedWebsiteRepository,
         ILogger<HeartbeatService> logger)
     {
         _deviceRepository = deviceRepository;
         _heartbeatRepository = heartbeatRepository;
+        _blockedWebsiteRepository = blockedWebsiteRepository;
         _logger = logger;
     }
 
@@ -55,12 +58,15 @@ public class HeartbeatService : IHeartbeatService
         // device timestamps — they share the scoped DbContext.
         await _heartbeatRepository.SaveChangesAsync(cancellationToken);
 
+        var blockedWebsites = await _blockedWebsiteRepository.GetByDeviceAsync(device.Id, cancellationToken);
+
         return new HeartbeatResponse
         {
             Success = true,
             Message = "Heartbeat received",
             ServerTime = utcNow,
-            UsbBlockingEnabled = device.UsbBlockingEnabled
+            UsbBlockingEnabled = device.UsbBlockingEnabled,
+            BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
         };
     }
 }
