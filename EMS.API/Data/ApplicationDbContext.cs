@@ -20,6 +20,10 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<BlockedWebsite> BlockedWebsites => Set<BlockedWebsite>();
 
+    public DbSet<InstalledApplication> InstalledApplications => Set<InstalledApplication>();
+
+    public DbSet<BlockedApplication> BlockedApplications => Set<BlockedApplication>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -138,6 +142,44 @@ public class ApplicationDbContext : DbContext
             entity.Property(b => b.Domain)
                 .HasMaxLength(253)
                 .IsRequired();
+
+            entity.HasOne(b => b.Device)
+                .WithMany()
+                .HasForeignKey(b => b.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InstalledApplication>(entity =>
+        {
+            entity.ToTable("installed_applications");
+
+            entity.HasKey(a => a.Id);
+
+            entity.HasIndex(a => a.DeviceId);
+
+            entity.Property(a => a.Name).HasMaxLength(300).IsRequired();
+            entity.Property(a => a.Version).HasMaxLength(100);
+            entity.Property(a => a.Publisher).HasMaxLength(200);
+            entity.Property(a => a.ExecutableName).HasMaxLength(260);
+
+            entity.HasOne(a => a.Device)
+                .WithMany()
+                .HasForeignKey(a => a.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BlockedApplication>(entity =>
+        {
+            entity.ToTable("blocked_applications");
+
+            entity.HasKey(b => b.Id);
+
+            // An executable can be blocked at most once per device.
+            entity.HasIndex(b => new { b.DeviceId, b.ExecutableName })
+                .IsUnique();
+
+            entity.Property(b => b.ExecutableName).HasMaxLength(260).IsRequired();
+            entity.Property(b => b.DisplayName).HasMaxLength(300);
 
             entity.HasOne(b => b.Device)
                 .WithMany()

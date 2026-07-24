@@ -43,6 +43,8 @@ public class HeartbeatService : IHeartbeatService
                 .Concat(outcome.BlockedWebsites)
                 .ToList();
             HostsFileHelper.ApplyBlocklist(domainsToBlock, _logger);
+
+            AppBlockingHelper.ApplyPolicy(outcome.BlockedApplications, _logger);
         }
 
         return outcome.Success;

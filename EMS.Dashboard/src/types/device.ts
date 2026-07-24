@@ -49,6 +49,19 @@ export interface BlockedWebsite {
   createdDate: string;
 }
 
+/** Mirrors EMS.API InstalledAppResponse. */
+export interface InstalledApp {
+  id: string;
+  name: string;
+  version: string | null;
+  publisher: string | null;
+  executableName: string | null;
+  isStoreApp: boolean;
+  isBlocked: boolean;
+  /** False when the app has no resolvable executable, so it cannot be blocked. */
+  canBlock: boolean;
+}
+
 /** Mirrors EMS.API DeviceMetricsResponse. Every metric may be null. */
 export interface DeviceMetrics {
   collectedAt: string | null;

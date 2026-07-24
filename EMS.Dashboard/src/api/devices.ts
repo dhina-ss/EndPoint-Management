@@ -1,4 +1,10 @@
-import type { AppUsageEntry, BlockedWebsite, Device, DeviceMetrics } from '../types/device';
+import type {
+  AppUsageEntry,
+  BlockedWebsite,
+  Device,
+  DeviceMetrics,
+  InstalledApp,
+} from '../types/device';
 
 // Empty base URL = same origin; the Vite dev server proxies /api to EMS.API.
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -76,6 +82,55 @@ export async function fetchAppUsage(id: string): Promise<AppUsageEntry[]> {
   }
 
   return (await response.json()) as AppUsageEntry[];
+}
+
+export async function fetchInstalledApps(id: string): Promise<InstalledApp[]> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/installed-apps`, {
+    headers: credentialHeaders,
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as InstalledApp[];
+}
+
+export async function blockApplication(
+  id: string,
+  executableName: string,
+  displayName: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-apps`, {
+    method: 'POST',
+    headers: {
+      ...credentialHeaders,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ executableName, displayName }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 400) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? 'This application cannot be blocked.');
+    }
+    throwForStatus(response.status);
+  }
+}
+
+export async function unblockApplication(id: string, executableName: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-apps/${encodeURIComponent(executableName)}`,
+    {
+      method: 'DELETE',
+      headers: credentialHeaders,
+    },
+  );
+
+  if (!response.ok && response.status !== 404) {
+    throwForStatus(response.status);
+  }
 }
 
 export async function fetchDeviceMetrics(id: string): Promise<DeviceMetrics> {

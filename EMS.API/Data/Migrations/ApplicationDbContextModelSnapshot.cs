@@ -53,6 +53,35 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("app_usage_records", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.BlockedApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ExecutableName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "ExecutableName")
+                        .IsUnique();
+
+                    b.ToTable("blocked_applications", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.BlockedWebsite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -268,7 +297,57 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("device_heartbeats", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.InstalledApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExecutableName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<bool>("IsStoreApp")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Publisher")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.ToTable("installed_applications", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.BlockedApplication", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()
@@ -302,6 +381,17 @@ namespace EMS.API.Data.Migrations
                 });
 
             modelBuilder.Entity("EMS.API.Entities.DeviceHeartbeat", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.InstalledApplication", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()

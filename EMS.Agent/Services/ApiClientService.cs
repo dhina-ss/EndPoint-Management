@@ -106,7 +106,8 @@ public class ApiClientService : IApiClientService
                 return new HeartbeatOutcome(
                     true,
                     result?.UsbBlockingEnabled ?? false,
-                    result?.BlockedWebsites ?? Array.Empty<string>());
+                    result?.BlockedWebsites ?? Array.Empty<string>(),
+                    result?.BlockedApplications ?? Array.Empty<string>());
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -181,6 +182,51 @@ public class ApiClientService : IApiClientService
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("App usage upload timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
+            return false;
+        }
+    }
+
+    public async Task<bool> SendInstalledAppsAsync(
+        IReadOnlyList<InstalledAppModel> applications, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            _logger.LogDebug("Installed-apps report skipped: agent has not registered yet.");
+            return false;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.InstalledAppsEndpoint)
+            {
+                Content = JsonContent.Create(new InstalledAppsPayload { Applications = applications.ToList() })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            _logger.LogWarning(
+                "Installed-apps report failed with status {StatusCode}.", (int)response.StatusCode);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex,
+                "Installed-apps report could not reach the EMS server at {BaseUrl}.", _httpClient.BaseAddress);
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Installed-apps report timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
             return false;
         }
     }
@@ -261,5 +307,5 @@ public class ApiClientService : IApiClientService
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
     private sealed record HeartbeatResult(
         bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
-        IReadOnlyList<string>? BlockedWebsites);
+        IReadOnlyList<string>? BlockedWebsites, IReadOnlyList<string>? BlockedApplications);
 }

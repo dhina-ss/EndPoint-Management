@@ -34,6 +34,9 @@ public class ApiSettings
     /// <summary>Relative path of the app-usage report endpoint.</summary>
     public string AppUsageEndpoint { get; set; } = "/api/devices/app-usage";
 
+    /// <summary>Relative path of the installed-applications report endpoint.</summary>
+    public string InstalledAppsEndpoint { get; set; } = "/api/devices/installed-apps";
+
     /// <summary>How often the agent samples the foreground application, in seconds.</summary>
     public int AppUsageSampleIntervalSeconds { get; set; } = 20;
 

@@ -21,15 +21,25 @@ public interface IApiClientService
     /// calling the server) when the agent has not registered yet.
     /// </summary>
     Task<bool> SendAppUsageAsync(IReadOnlyList<AppUsageModel> usage, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reports the full installed-application inventory. Returns false
+    /// (without calling the server) when the agent has not registered yet.
+    /// </summary>
+    Task<bool> SendInstalledAppsAsync(
+        IReadOnlyList<InstalledAppModel> applications, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// Result of a heartbeat attempt. <see cref="UsbBlockingEnabled"/> and
-/// <see cref="BlockedWebsites"/> are only meaningful when
+/// Result of a heartbeat attempt. The policy fields are only meaningful when
 /// <see cref="Success"/> is true.
 /// </summary>
 public sealed record HeartbeatOutcome(
-    bool Success, bool UsbBlockingEnabled, IReadOnlyList<string> BlockedWebsites)
+    bool Success,
+    bool UsbBlockingEnabled,
+    IReadOnlyList<string> BlockedWebsites,
+    IReadOnlyList<string> BlockedApplications)
 {
-    public static readonly HeartbeatOutcome Failed = new(false, false, Array.Empty<string>());
+    public static readonly HeartbeatOutcome Failed =
+        new(false, false, Array.Empty<string>(), Array.Empty<string>());
 }

@@ -1,4 +1,5 @@
 using EMS.Agent.Configuration;
+using EMS.Agent.Helpers;
 using EMS.Agent.Services;
 using Microsoft.Extensions.Options;
 
@@ -77,6 +78,10 @@ public class AgentWorker : BackgroundService
                     "Inventory could not be sent to the EMS server; next attempt in {Interval} minutes.",
                     _apiSettings.PollingIntervalMinutes);
             }
+
+            // Installed software changes rarely, so it rides the same slow
+            // inventory cadence rather than the 60s heartbeat.
+            await ReportInstalledAppsAsync(apiClient, stoppingToken);
         }
         catch (OperationCanceledException)
         {
@@ -87,6 +92,35 @@ public class AgentWorker : BackgroundService
             _logger.LogError(ex,
                 "Agent cycle failed; the agent keeps running, next attempt in {Interval} minutes.",
                 _apiSettings.PollingIntervalMinutes);
+        }
+    }
+
+    /// <summary>
+    /// Scans and uploads installed software. Isolated from the main cycle so
+    /// a scan failure never prevents the hardware inventory from reporting.
+    /// </summary>
+    private async Task ReportInstalledAppsAsync(IApiClientService apiClient, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var applications = InstalledAppsHelper.Collect(_logger);
+            if (applications.Count == 0)
+            {
+                return;
+            }
+
+            if (await apiClient.SendInstalledAppsAsync(applications, stoppingToken))
+            {
+                _logger.LogInformation("Reported {Count} installed application(s).", applications.Count);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Installed-application scan failed for this cycle.");
         }
     }
 }

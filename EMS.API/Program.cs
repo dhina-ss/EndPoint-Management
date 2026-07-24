@@ -56,10 +56,12 @@ builder.Services.AddScoped<IDeviceAuthRepository, DeviceAuthRepository>();
 builder.Services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
 builder.Services.AddScoped<IAppUsageRepository, AppUsageRepository>();
 builder.Services.AddScoped<IBlockedWebsiteRepository, BlockedWebsiteRepository>();
+builder.Services.AddScoped<IApplicationInventoryRepository, ApplicationInventoryRepository>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
 builder.Services.AddScoped<IAppUsageService, AppUsageService>();
 builder.Services.AddScoped<IBlockedWebsiteService, BlockedWebsiteService>();
+builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventoryService>();
 builder.Services.AddScoped<IDeviceAuthService, DeviceAuthService>();
 builder.Services.AddScoped<ITokenValidationService, TokenValidationService>();
 

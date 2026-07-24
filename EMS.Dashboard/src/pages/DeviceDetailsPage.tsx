@@ -30,14 +30,20 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import BatteryChargingFullIcon from '@mui/icons-material/BatteryChargingFull';
 import BatteryStdIcon from '@mui/icons-material/BatteryStd';
+import InventoryIcon from '@mui/icons-material/Inventory2';
+import SearchIcon from '@mui/icons-material/Search';
+import InputAdornment from '@mui/material/InputAdornment';
 import {
   addBlockedWebsite,
+  blockApplication,
   fetchAppUsage,
   fetchBlockedWebsites,
   fetchDevice,
   fetchDeviceMetrics,
+  fetchInstalledApps,
   removeBlockedWebsite,
   setUsbBlocking,
+  unblockApplication,
 } from '../api/devices';
 import {
   formatDuration,
@@ -48,6 +54,7 @@ import {
   type BlockedWebsite,
   type Device,
   type DeviceMetrics,
+  type InstalledApp,
 } from '../types/device';
 
 function formatDate(iso: string | null): string {
@@ -146,6 +153,11 @@ export default function DeviceDetailsPage() {
   const [metrics, setMetrics] = useState<DeviceMetrics | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
 
+  const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
+  const [appSearch, setAppSearch] = useState('');
+  const [appBlockPending, setAppBlockPending] = useState<string | null>(null);
+  const [appBlockError, setAppBlockError] = useState<string | null>(null);
+
   const [blockedSites, setBlockedSites] = useState<BlockedWebsite[]>([]);
   const [newDomain, setNewDomain] = useState('');
   const [blockPending, setBlockPending] = useState(false);
@@ -206,12 +218,45 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadInstalledApps = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setInstalledApps(await fetchInstalledApps(id));
+    } catch (err) {
+      setAppBlockError(err instanceof Error ? err.message : 'Failed to load installed applications.');
+    }
+  }, [id]);
+
   useEffect(() => {
     void loadDevice();
     void loadAppUsage();
     void loadBlockedSites();
     void loadMetrics();
-  }, [loadDevice, loadAppUsage, loadBlockedSites, loadMetrics]);
+    void loadInstalledApps();
+  }, [loadDevice, loadAppUsage, loadBlockedSites, loadMetrics, loadInstalledApps]);
+
+  const handleToggleAppBlock = async (app: InstalledApp, shouldBlock: boolean) => {
+    if (!id || !app.executableName) {
+      return;
+    }
+    setAppBlockPending(app.executableName);
+    setAppBlockError(null);
+    try {
+      if (shouldBlock) {
+        await blockApplication(id, app.executableName, app.name);
+      } else {
+        await unblockApplication(id, app.executableName);
+      }
+      // Re-read so entries for uninstalled-but-blocked apps stay accurate.
+      await loadInstalledApps();
+    } catch (err) {
+      setAppBlockError(err instanceof Error ? err.message : 'Failed to update the application block.');
+    } finally {
+      setAppBlockPending(null);
+    }
+  };
 
   // Live monitoring polls on its own so the panel stays current without the
   // user pressing Refresh. The agent reports every 60s; polling at 30s keeps
@@ -610,6 +655,116 @@ export default function DeviceDetailsPage() {
                   </Stack>
                 ))}
               </Stack>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={2}
+              sx={{ mb: 1 }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <InventoryIcon color="primary" />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Installed Applications
+                </Typography>
+                <Chip label={installedApps.length} size="small" />
+                {installedApps.some((a) => a.isBlocked) && (
+                  <Chip
+                    label={`${installedApps.filter((a) => a.isBlocked).length} blocked`}
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+              <TextField
+                size="small"
+                placeholder="Search applications…"
+                value={appSearch}
+                onChange={(event) => setAppSearch(event.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Stack>
+            <Divider sx={{ mb: 1 }} />
+
+            {appBlockError && (
+              <Alert severity="error" sx={{ mb: 1.5 }}>
+                {appBlockError}
+              </Alert>
+            )}
+
+            {installedApps.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                No application inventory reported yet. It arrives with the device's next inventory
+                cycle (every 10 minutes).
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>
+                {installedApps
+                  .filter((app) => {
+                    const term = appSearch.trim().toLowerCase();
+                    if (!term) {
+                      return true;
+                    }
+                    return [app.name, app.publisher, app.executableName]
+                      .filter((v): v is string => v !== null)
+                      .some((v) => v.toLowerCase().includes(term));
+                  })
+                  .map((app) => (
+                    <Stack
+                      key={`${app.id}-${app.executableName ?? app.name}`}
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      spacing={2}
+                      sx={{ py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2" noWrap>
+                            {app.name}
+                          </Typography>
+                          {app.isStoreApp && <Chip label="Store" size="small" variant="outlined" />}
+                          {app.isBlocked && <Chip label="Blocked" size="small" color="error" />}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {[app.publisher, app.version, app.executableName]
+                            .filter(Boolean)
+                            .join(' · ') || '—'}
+                        </Typography>
+                      </Box>
+
+                      {app.canBlock ? (
+                        <Switch
+                          checked={app.isBlocked}
+                          disabled={appBlockPending === app.executableName}
+                          onChange={(event) => void handleToggleAppBlock(app, event.target.checked)}
+                          inputProps={{ 'aria-label': `Block ${app.name}` }}
+                        />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary" sx={{ pr: 1 }}>
+                          No executable
+                        </Typography>
+                      )}
+                    </Stack>
+                  ))}
+              </Box>
             )}
           </CardContent>
         </Card>

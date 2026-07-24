@@ -22,4 +22,10 @@ public class HeartbeatResponse
     /// them to the hosts file after each heartbeat.
     /// </summary>
     public IReadOnlyList<string> BlockedWebsites { get; set; } = [];
+
+    /// <summary>
+    /// Executable names the agent must prevent from launching on this
+    /// device, e.g. "chrome.exe". Applied after each heartbeat.
+    /// </summary>
+    public IReadOnlyList<string> BlockedApplications { get; set; } = [];
 }

@@ -9,17 +9,20 @@ public class HeartbeatService : IHeartbeatService
     private readonly IDeviceRepository _deviceRepository;
     private readonly IHeartbeatRepository _heartbeatRepository;
     private readonly IBlockedWebsiteRepository _blockedWebsiteRepository;
+    private readonly IApplicationInventoryRepository _applicationRepository;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
         IDeviceRepository deviceRepository,
         IHeartbeatRepository heartbeatRepository,
         IBlockedWebsiteRepository blockedWebsiteRepository,
+        IApplicationInventoryRepository applicationRepository,
         ILogger<HeartbeatService> logger)
     {
         _deviceRepository = deviceRepository;
         _heartbeatRepository = heartbeatRepository;
         _blockedWebsiteRepository = blockedWebsiteRepository;
+        _applicationRepository = applicationRepository;
         _logger = logger;
     }
 
@@ -62,6 +65,7 @@ public class HeartbeatService : IHeartbeatService
         await _heartbeatRepository.SaveChangesAsync(cancellationToken);
 
         var blockedWebsites = await _blockedWebsiteRepository.GetByDeviceAsync(device.Id, cancellationToken);
+        var blockedApps = await _applicationRepository.GetBlockedAsync(device.Id, cancellationToken);
 
         return new HeartbeatResponse
         {
@@ -69,7 +73,8 @@ public class HeartbeatService : IHeartbeatService
             Message = "Heartbeat received",
             ServerTime = utcNow,
             UsbBlockingEnabled = device.UsbBlockingEnabled,
-            BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
+            BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList(),
+            BlockedApplications = blockedApps.Select(b => b.ExecutableName).ToList()
         };
     }
 
