@@ -44,7 +44,7 @@ public class HeartbeatService : IHeartbeatService
         device.LastHeartbeatTime = utcNow;
         device.LastSeen = utcNow;
 
-        await _heartbeatRepository.AddAsync(new DeviceHeartbeat
+        var heartbeat = new DeviceHeartbeat
         {
             Id = Guid.NewGuid(),
             DeviceId = device.Id,
@@ -52,7 +52,10 @@ public class HeartbeatService : IHeartbeatService
             Username = request.Username,
             AgentVersion = request.AgentVersion,
             HeartbeatTime = utcNow
-        }, cancellationToken);
+        };
+
+        ApplyMetrics(heartbeat, request.Metrics);
+        await _heartbeatRepository.AddAsync(heartbeat, cancellationToken);
 
         // One SaveChanges persists both the heartbeat row and the updated
         // device timestamps — they share the scoped DbContext.
@@ -68,5 +71,72 @@ public class HeartbeatService : IHeartbeatService
             UsbBlockingEnabled = device.UsbBlockingEnabled,
             BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
         };
+    }
+
+    /// <summary>
+    /// A device counts as online when its last heartbeat is within three
+    /// intervals (3 x 60s), i.e. three missed beats. Kept server-side so the
+    /// dashboard, alerts and reports can never disagree on the rule.
+    /// </summary>
+    private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(3);
+
+    public async Task<DeviceMetricsResponse?> GetLatestMetricsAsync(
+        Guid deviceInternalId, CancellationToken cancellationToken = default)
+    {
+        var device = await _deviceRepository.GetByIdAsync(deviceInternalId, cancellationToken);
+        if (device is null)
+        {
+            return null;
+        }
+
+        var isOnline = device.LastHeartbeatTime is not null
+            && DateTime.UtcNow - device.LastHeartbeatTime.Value < OnlineThreshold;
+
+        var latest = await _heartbeatRepository.GetLatestForDeviceAsync(deviceInternalId, cancellationToken);
+        if (latest is null)
+        {
+            return new DeviceMetricsResponse { IsOnline = isOnline };
+        }
+
+        return new DeviceMetricsResponse
+        {
+            CollectedAt = latest.HeartbeatTime,
+            IsOnline = isOnline,
+            CpuUsagePercent = latest.CpuUsagePercent,
+            MemoryUsagePercent = latest.MemoryUsagePercent,
+            MemoryUsedMb = latest.MemoryUsedMb,
+            MemoryTotalMb = latest.MemoryTotalMb,
+            DiskUsagePercent = latest.DiskUsagePercent,
+            DiskUsedGb = latest.DiskUsedGb,
+            DiskTotalGb = latest.DiskTotalGb,
+            NetworkSentKbps = latest.NetworkSentKbps,
+            NetworkReceivedKbps = latest.NetworkReceivedKbps,
+            UptimeSeconds = latest.UptimeSeconds,
+            BatteryPercent = latest.BatteryPercent,
+            BatteryCharging = latest.BatteryCharging,
+            HasBattery = latest.HasBattery
+        };
+    }
+
+    private static void ApplyMetrics(DeviceHeartbeat heartbeat, SystemMetricsPayload? metrics)
+    {
+        if (metrics is null)
+        {
+            return;
+        }
+
+        heartbeat.CpuUsagePercent = metrics.CpuUsagePercent;
+        heartbeat.MemoryUsagePercent = metrics.MemoryUsagePercent;
+        heartbeat.MemoryUsedMb = metrics.MemoryUsedMb;
+        heartbeat.MemoryTotalMb = metrics.MemoryTotalMb;
+        heartbeat.DiskUsagePercent = metrics.DiskUsagePercent;
+        heartbeat.DiskUsedGb = metrics.DiskUsedGb;
+        heartbeat.DiskTotalGb = metrics.DiskTotalGb;
+        heartbeat.NetworkSentKbps = metrics.NetworkSentKbps;
+        heartbeat.NetworkReceivedKbps = metrics.NetworkReceivedKbps;
+        heartbeat.UptimeSeconds = metrics.UptimeSeconds;
+        heartbeat.BatteryPercent = metrics.BatteryPercent;
+        heartbeat.BatteryCharging = metrics.BatteryCharging;
+        heartbeat.HasBattery = metrics.HasBattery;
     }
 }

@@ -16,4 +16,7 @@ public class HeartbeatRequest
 
     [MaxLength(50)]
     public string? AgentVersion { get; set; }
+
+    /// <summary>Live resource snapshot; omitted by agents without live monitoring.</summary>
+    public SystemMetricsPayload? Metrics { get; set; }
 }

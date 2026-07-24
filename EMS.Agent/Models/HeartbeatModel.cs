@@ -10,4 +10,10 @@ public class HeartbeatModel
     public string? Username { get; set; }
 
     public string? AgentVersion { get; set; }
+
+    /// <summary>
+    /// Live resource snapshot. Null if metrics collection failed entirely —
+    /// the heartbeat still counts for liveness either way.
+    /// </summary>
+    public SystemMetricsModel? Metrics { get; set; }
 }

@@ -24,6 +24,10 @@ public static class ServiceCollectionExtensions
         // until the worker flushes and uploads it.
         services.AddSingleton<IAppUsageTrackerService, AppUsageTrackerService>();
 
+        // Singleton: network throughput is a rate, so the previous sample's
+        // byte counters must survive between heartbeats.
+        services.AddSingleton<ISystemMetricsService, SystemMetricsService>();
+
         services.AddScoped<IDeviceCollectorService, DeviceCollectorService>();
         services.AddScoped<IHeartbeatService, HeartbeatService>();
 

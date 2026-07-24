@@ -15,11 +15,16 @@ public class HeartbeatService : IHeartbeatService
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
 
     private readonly IApiClientService _apiClient;
+    private readonly ISystemMetricsService _metricsService;
     private readonly ILogger<HeartbeatService> _logger;
 
-    public HeartbeatService(IApiClientService apiClient, ILogger<HeartbeatService> logger)
+    public HeartbeatService(
+        IApiClientService apiClient,
+        ISystemMetricsService metricsService,
+        ILogger<HeartbeatService> logger)
     {
         _apiClient = apiClient;
+        _metricsService = metricsService;
         _logger = logger;
     }
 
@@ -65,6 +70,17 @@ public class HeartbeatService : IHeartbeatService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Could not collect heartbeat details; sending partial payload.");
+        }
+
+        // Live monitoring rides along with the heartbeat rather than running
+        // its own uploader: the cadence (60s) is already what live metrics need.
+        try
+        {
+            heartbeat.Metrics = _metricsService.Collect();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not collect system metrics; sending heartbeat without them.");
         }
 
         return heartbeat;

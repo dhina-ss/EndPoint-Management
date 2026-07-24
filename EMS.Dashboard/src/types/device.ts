@@ -49,6 +49,45 @@ export interface BlockedWebsite {
   createdDate: string;
 }
 
+/** Mirrors EMS.API DeviceMetricsResponse. Every metric may be null. */
+export interface DeviceMetrics {
+  collectedAt: string | null;
+  isOnline: boolean;
+  cpuUsagePercent: number | null;
+  memoryUsagePercent: number | null;
+  memoryUsedMb: number | null;
+  memoryTotalMb: number | null;
+  diskUsagePercent: number | null;
+  diskUsedGb: number | null;
+  diskTotalGb: number | null;
+  networkSentKbps: number | null;
+  networkReceivedKbps: number | null;
+  uptimeSeconds: number | null;
+  batteryPercent: number | null;
+  batteryCharging: boolean | null;
+  hasBattery: boolean | null;
+}
+
+/** "3d 4h 12m" style uptime, from a duration in seconds. */
+export function formatUptime(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+/** Network rates arrive in KB/s; show MB/s once they get large. */
+export function formatRate(kbps: number): string {
+  return kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps.toFixed(1)} KB/s`;
+}
+
 export function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

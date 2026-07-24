@@ -13,15 +13,18 @@ public class DevicesController : ControllerBase
     private readonly IDeviceService _deviceService;
     private readonly IAppUsageService _appUsageService;
     private readonly IBlockedWebsiteService _blockedWebsiteService;
+    private readonly IHeartbeatService _heartbeatService;
 
     public DevicesController(
         IDeviceService deviceService,
         IAppUsageService appUsageService,
-        IBlockedWebsiteService blockedWebsiteService)
+        IBlockedWebsiteService blockedWebsiteService,
+        IHeartbeatService heartbeatService)
     {
         _deviceService = deviceService;
         _appUsageService = appUsageService;
         _blockedWebsiteService = blockedWebsiteService;
+        _heartbeatService = heartbeatService;
     }
 
     /// <summary>
@@ -100,6 +103,22 @@ public class DevicesController : ControllerBase
         var usageDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var usage = await _appUsageService.GetUsageAsync(id, usageDate, cancellationToken);
         return Ok(usage);
+    }
+
+    /// <summary>
+    /// Latest live-monitoring snapshot (CPU, memory, disk, network, uptime,
+    /// battery, online state) for a device.
+    /// </summary>
+    [HttpGet("{id:guid}/metrics")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceMetricsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceMetricsResponse>> GetMetrics(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var metrics = await _heartbeatService.GetLatestMetricsAsync(id, cancellationToken);
+        return metrics is null ? NotFound() : Ok(metrics);
     }
 
     /// <summary>

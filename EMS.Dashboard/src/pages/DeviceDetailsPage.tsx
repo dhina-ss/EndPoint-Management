@@ -27,20 +27,27 @@ import PublicOffIcon from '@mui/icons-material/PublicOff';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import ShieldIcon from '@mui/icons-material/Shield';
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import BatteryChargingFullIcon from '@mui/icons-material/BatteryChargingFull';
+import BatteryStdIcon from '@mui/icons-material/BatteryStd';
 import {
   addBlockedWebsite,
   fetchAppUsage,
   fetchBlockedWebsites,
   fetchDevice,
+  fetchDeviceMetrics,
   removeBlockedWebsite,
   setUsbBlocking,
 } from '../api/devices';
 import {
   formatDuration,
+  formatRate,
+  formatUptime,
   isOnline,
   type AppUsageEntry,
   type BlockedWebsite,
   type Device,
+  type DeviceMetrics,
 } from '../types/device';
 
 function formatDate(iso: string | null): string {
@@ -60,6 +67,38 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
         {value || '—'}
       </Typography>
     </Stack>
+  );
+}
+
+/** A labelled usage bar; colours shift to warning/error as it fills. */
+function MetricBar({
+  label,
+  percent,
+  detail,
+}: {
+  label: string;
+  percent: number | null;
+  detail?: string;
+}) {
+  const value = percent ?? 0;
+  const color = value >= 90 ? 'error' : value >= 75 ? 'warning' : 'primary';
+
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+        <Typography variant="body2">{label}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {percent === null ? '—' : `${value.toFixed(1)}%`}
+          {detail && percent !== null ? ` · ${detail}` : ''}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={Math.min(100, Math.max(0, value))}
+        color={color}
+        sx={{ height: 8, borderRadius: 4 }}
+      />
+    </Box>
   );
 }
 
@@ -103,6 +142,9 @@ export default function DeviceDetailsPage() {
 
   const [usbBlockingPending, setUsbBlockingPending] = useState(false);
   const [usbBlockingError, setUsbBlockingError] = useState<string | null>(null);
+
+  const [metrics, setMetrics] = useState<DeviceMetrics | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
 
   const [blockedSites, setBlockedSites] = useState<BlockedWebsite[]>([]);
   const [newDomain, setNewDomain] = useState('');
@@ -152,11 +194,32 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadMetrics = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setMetrics(await fetchDeviceMetrics(id));
+      setMetricsError(null);
+    } catch (err) {
+      setMetricsError(err instanceof Error ? err.message : 'Failed to load live metrics.');
+    }
+  }, [id]);
+
   useEffect(() => {
     void loadDevice();
     void loadAppUsage();
     void loadBlockedSites();
-  }, [loadDevice, loadAppUsage, loadBlockedSites]);
+    void loadMetrics();
+  }, [loadDevice, loadAppUsage, loadBlockedSites, loadMetrics]);
+
+  // Live monitoring polls on its own so the panel stays current without the
+  // user pressing Refresh. The agent reports every 60s; polling at 30s keeps
+  // the display at most one interval behind.
+  useEffect(() => {
+    const timer = window.setInterval(() => void loadMetrics(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [loadMetrics]);
 
   const handleAddBlockedSite = async () => {
     if (!id || !newDomain.trim()) {
@@ -303,6 +366,134 @@ export default function DeviceDetailsPage() {
             <DetailRow label="Last Inventory Update" value={formatDate(device.updatedDate)} />
           </DetailCard>
         </Box>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ mb: 1 }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <MonitorHeartIcon color="primary" />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Live Monitoring
+                </Typography>
+                <Chip
+                  label={metrics?.isOnline ? 'Online' : 'Offline'}
+                  color={metrics?.isOnline ? 'success' : 'default'}
+                  size="small"
+                  variant={metrics?.isOnline ? 'filled' : 'outlined'}
+                />
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                {metrics?.collectedAt
+                  ? `Updated ${new Date(metrics.collectedAt).toLocaleTimeString()}`
+                  : 'No data yet'}
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1.5 }} />
+
+            {metricsError && (
+              <Alert severity="error" sx={{ mb: 1.5 }}>
+                {metricsError}
+              </Alert>
+            )}
+
+            {!metricsError && metrics?.cpuUsagePercent == null && metrics?.uptimeSeconds == null && (
+              <Alert severity="info" sx={{ mb: 1.5 }}>
+                This device has not reported live metrics yet. It needs an agent build with live
+                monitoring; data appears within a minute of the next heartbeat.
+              </Alert>
+            )}
+
+            <Box
+              sx={{
+                display: 'grid',
+                gap: { xs: 0, md: 3 },
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              }}
+            >
+              <Box>
+                <MetricBar label="CPU Usage" percent={metrics?.cpuUsagePercent ?? null} />
+                <MetricBar
+                  label="RAM Usage"
+                  percent={metrics?.memoryUsagePercent ?? null}
+                  detail={
+                    metrics?.memoryUsedMb != null && metrics?.memoryTotalMb != null
+                      ? `${(metrics.memoryUsedMb / 1024).toFixed(1)} / ${(metrics.memoryTotalMb / 1024).toFixed(1)} GB`
+                      : undefined
+                  }
+                />
+                <MetricBar
+                  label="Disk Usage (system drive)"
+                  percent={metrics?.diskUsagePercent ?? null}
+                  detail={
+                    metrics?.diskUsedGb != null && metrics?.diskTotalGb != null
+                      ? `${metrics.diskUsedGb} / ${metrics.diskTotalGb} GB`
+                      : undefined
+                  }
+                />
+              </Box>
+
+              <Box>
+                <DetailRow
+                  label="Network ↑ sent"
+                  value={
+                    metrics?.networkSentKbps != null ? formatRate(metrics.networkSentKbps) : null
+                  }
+                />
+                <DetailRow
+                  label="Network ↓ received"
+                  value={
+                    metrics?.networkReceivedKbps != null
+                      ? formatRate(metrics.networkReceivedKbps)
+                      : null
+                  }
+                />
+                <DetailRow
+                  label="Uptime"
+                  value={
+                    metrics?.uptimeSeconds != null ? formatUptime(metrics.uptimeSeconds) : null
+                  }
+                />
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ py: 0.75 }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Battery
+                  </Typography>
+                  {metrics?.hasBattery === false ? (
+                    <Typography variant="body2">No battery (desktop)</Typography>
+                  ) : metrics?.batteryPercent != null ? (
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      {metrics.batteryCharging ? (
+                        <BatteryChargingFullIcon fontSize="small" color="success" />
+                      ) : (
+                        <BatteryStdIcon
+                          fontSize="small"
+                          color={metrics.batteryPercent <= 20 ? 'error' : 'inherit'}
+                        />
+                      )}
+                      <Typography variant="body2">
+                        {metrics.batteryPercent}%{metrics.batteryCharging ? ' · charging' : ''}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2">—</Typography>
+                  )}
+                </Stack>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
       )}
 
       {device && !loading && (

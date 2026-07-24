@@ -208,8 +208,29 @@ namespace EMS.API.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<bool?>("BatteryCharging")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("BatteryPercent")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("CpuUsagePercent")
+                        .HasColumnType("double precision");
+
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("DiskTotalGb")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("DiskUsagePercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("DiskUsedGb")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("HasBattery")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("HeartbeatTime")
                         .HasColumnType("timestamp with time zone");
@@ -217,6 +238,24 @@ namespace EMS.API.Data.Migrations
                     b.Property<string>("IPAddress")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
+
+                    b.Property<int?>("MemoryTotalMb")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("MemoryUsagePercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("MemoryUsedMb")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("NetworkReceivedKbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("NetworkSentKbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<long?>("UptimeSeconds")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Username")
                         .HasMaxLength(100)

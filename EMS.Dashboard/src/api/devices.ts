@@ -1,4 +1,4 @@
-import type { AppUsageEntry, BlockedWebsite, Device } from '../types/device';
+import type { AppUsageEntry, BlockedWebsite, Device, DeviceMetrics } from '../types/device';
 
 // Empty base URL = same origin; the Vite dev server proxies /api to EMS.API.
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -76,6 +76,18 @@ export async function fetchAppUsage(id: string): Promise<AppUsageEntry[]> {
   }
 
   return (await response.json()) as AppUsageEntry[];
+}
+
+export async function fetchDeviceMetrics(id: string): Promise<DeviceMetrics> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/metrics`, {
+    headers: credentialHeaders,
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as DeviceMetrics;
 }
 
 export async function fetchBlockedWebsites(id: string): Promise<BlockedWebsite[]> {
