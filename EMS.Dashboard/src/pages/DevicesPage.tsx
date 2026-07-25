@@ -19,6 +19,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { fetchDevices } from '../api/devices';
 import { isOnline, type Device } from '../types/device';
 
@@ -120,6 +121,13 @@ export default function DevicesPage() {
               },
             }}
           />
+          <Button
+            variant="outlined"
+            startIcon={<PersonAddIcon />}
+            onClick={() => navigate('/users/new')}
+          >
+            Create User
+          </Button>
           <Button
             variant="contained"
             startIcon={<RefreshIcon />}

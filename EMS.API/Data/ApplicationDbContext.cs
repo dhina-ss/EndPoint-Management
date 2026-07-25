@@ -24,6 +24,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<BlockedApplication> BlockedApplications => Set<BlockedApplication>();
 
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -185,6 +187,23 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(b => b.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.ToTable("app_users");
+
+            entity.HasKey(u => u.Id);
+
+            // Each of these identifies a user, so each is unique.
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.HasIndex(u => u.EmployeeCode).IsUnique();
+
+            entity.Property(u => u.Email).HasMaxLength(256).IsRequired();
+            entity.Property(u => u.EmployeeCode).HasMaxLength(50).IsRequired();
+            entity.Property(u => u.Username).HasMaxLength(50).IsRequired();
+            entity.Property(u => u.PasswordHash).IsRequired();
         });
     }
 }

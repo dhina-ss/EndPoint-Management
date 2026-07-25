@@ -1,9 +1,11 @@
 using EMS.API.Configuration;
 using EMS.API.Data;
+using EMS.API.Entities;
 using EMS.API.Middleware;
 using EMS.API.Repositories;
 using EMS.API.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 const string FrontendCorsPolicy = "Frontend";
@@ -57,11 +59,16 @@ builder.Services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
 builder.Services.AddScoped<IAppUsageRepository, AppUsageRepository>();
 builder.Services.AddScoped<IBlockedWebsiteRepository, BlockedWebsiteRepository>();
 builder.Services.AddScoped<IApplicationInventoryRepository, ApplicationInventoryRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
 builder.Services.AddScoped<IAppUsageService, AppUsageService>();
 builder.Services.AddScoped<IBlockedWebsiteService, BlockedWebsiteService>();
 builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventoryService>();
+builder.Services.AddScoped<IUserService, UserService>();
+
+// Salted PBKDF2 password hashing for dashboard users.
+builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 builder.Services.AddScoped<IDeviceAuthService, DeviceAuthService>();
 builder.Services.AddScoped<ITokenValidationService, TokenValidationService>();
 
