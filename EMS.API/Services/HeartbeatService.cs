@@ -69,6 +69,7 @@ public class HeartbeatService : IHeartbeatService
             Message = "Heartbeat received",
             ServerTime = utcNow,
             UsbBlockingEnabled = device.UsbBlockingEnabled,
+            StoreGatingEnabled = device.StoreGatingEnabled,
             BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
         };
     }

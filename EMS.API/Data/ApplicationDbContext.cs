@@ -67,6 +67,9 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(d => d.UsbBlockingEnabled)
                 .HasDefaultValue(false);
+
+            entity.Property(d => d.StoreGatingEnabled)
+                .HasDefaultValue(false);
         });
 
         modelBuilder.Entity<DeviceAuthentication>(entity =>

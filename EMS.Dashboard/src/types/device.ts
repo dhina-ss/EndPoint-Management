@@ -20,6 +20,7 @@ export interface Device {
   lastSeen: string;
   lastHeartbeatTime: string | null;
   usbBlockingEnabled: boolean;
+  storeGatingEnabled: boolean;
 }
 
 /**

@@ -13,8 +13,11 @@ public class ApiSettings
     /// <summary>Relative path of the device registration endpoint.</summary>
     public string RegisterEndpoint { get; set; } = "/api/devices/register";
 
-    /// <summary>Relative path of the user login endpoint (agent activation).</summary>
+    /// <summary>Relative path of the user login endpoint (agent activation and Store unlock).</summary>
     public string LoginEndpoint { get; set; } = "/api/auth/login";
+
+    /// <summary>How long a Microsoft Store unlock lasts, in minutes.</summary>
+    public int StoreUnlockMinutes { get; set; } = 15;
 
     /// <summary>Relative path of the heartbeat endpoint.</summary>
     public string HeartbeatEndpoint { get; set; } = "/api/devices/heartbeat";
