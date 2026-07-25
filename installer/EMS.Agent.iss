@@ -52,7 +52,9 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 
 [Icons]
-; Start Menu shortcut for uninstall only - a service has no UI to launch.
+; The device is dormant until an EMS user signs in, so give them a way to
+; re-open the activation window if they close it before signing in.
+Name: "{group}\Activate {#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]
@@ -61,6 +63,10 @@ Filename: "{sys}\sc.exe"; Parameters: "description {#MyServiceName} ""Collects d
 ; Restart automatically if the service ever crashes (3 restarts, 1 min apart, reset counter daily).
 Filename: "{sys}\sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden
+; Open the activation login window immediately after install. postinstall +
+; nowait so setup finishes; skipifsilent so unattended installs are not
+; blocked waiting on a person. The service stays dormant until this sign-in.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"; Description: "Activate EMS Agent (sign in)"; Flags: postinstall nowait skipifsilent
 
 [Code]
 // Application usage (foreground-window) tracking cannot run inside the

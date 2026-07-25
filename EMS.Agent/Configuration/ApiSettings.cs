@@ -13,6 +13,9 @@ public class ApiSettings
     /// <summary>Relative path of the device registration endpoint.</summary>
     public string RegisterEndpoint { get; set; } = "/api/devices/register";
 
+    /// <summary>Relative path of the user login endpoint (agent activation).</summary>
+    public string LoginEndpoint { get; set; } = "/api/auth/login";
+
     /// <summary>Relative path of the heartbeat endpoint.</summary>
     public string HeartbeatEndpoint { get; set; } = "/api/devices/heartbeat";
 

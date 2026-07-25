@@ -54,8 +54,15 @@ public class HeartbeatWorker : BackgroundService
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var heartbeatService = scope.ServiceProvider.GetRequiredService<IHeartbeatService>();
 
+            // No heartbeat or policy enforcement until the device is activated.
+            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
+            if (!activation.IsActivated())
+            {
+                return;
+            }
+
+            var heartbeatService = scope.ServiceProvider.GetRequiredService<IHeartbeatService>();
             await heartbeatService.SendHeartbeatAsync(stoppingToken);
         }
         catch (OperationCanceledException)

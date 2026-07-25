@@ -11,6 +11,9 @@ public interface IUserRepository
 
     Task<bool> EmployeeCodeExistsAsync(string employeeCode, CancellationToken cancellationToken = default);
 
+    /// <summary>Finds a user by username or email (case-insensitive) for sign-in.</summary>
+    Task<AppUser?> GetByUsernameOrEmailAsync(string usernameOrEmail, CancellationToken cancellationToken = default);
+
     Task AddAsync(AppUser user, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

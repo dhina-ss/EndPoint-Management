@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net8.0-windows + WinForms for the activation login window. The agent
+         is already Windows-only, so this only formalizes that. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-EMS.Agent-0fdb5ff2-d827-4c2a-9646-89e123494e24</UserSecretsId>

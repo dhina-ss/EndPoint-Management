@@ -66,6 +66,7 @@ builder.Services.AddScoped<IAppUsageService, AppUsageService>();
 builder.Services.AddScoped<IBlockedWebsiteService, BlockedWebsiteService>();
 builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventoryService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Salted PBKDF2 password hashing for dashboard users.
 builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();

@@ -22,6 +22,14 @@ public class UserRepository : IUserRepository
     public Task<bool> EmployeeCodeExistsAsync(string employeeCode, CancellationToken cancellationToken = default)
         => _dbContext.AppUsers.AnyAsync(u => u.EmployeeCode.ToLower() == employeeCode.ToLower(), cancellationToken);
 
+    public Task<AppUser?> GetByUsernameOrEmailAsync(
+        string usernameOrEmail, CancellationToken cancellationToken = default)
+    {
+        var value = usernameOrEmail.ToLower();
+        return _dbContext.AppUsers
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == value || u.Email.ToLower() == value, cancellationToken);
+    }
+
     public async Task AddAsync(AppUser user, CancellationToken cancellationToken = default)
     {
         await _dbContext.AppUsers.AddAsync(user, cancellationToken);

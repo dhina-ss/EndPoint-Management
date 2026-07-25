@@ -58,6 +58,16 @@ public class AgentWorker : BackgroundService
             // Scoped services per cycle; the singleton worker must not
             // capture the typed HttpClient for the process lifetime.
             using var scope = _scopeFactory.CreateScope();
+
+            // Activation gate: until an EMS user signs in on this device, the
+            // agent registers/collects/reports nothing.
+            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
+            if (!activation.IsActivated())
+            {
+                _logger.LogInformation("Waiting for activation; sign in via the EMS Agent login to activate.");
+                return;
+            }
+
             var collector = scope.ServiceProvider.GetRequiredService<IDeviceCollectorService>();
             var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
 

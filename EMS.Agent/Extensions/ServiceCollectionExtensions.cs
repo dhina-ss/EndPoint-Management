@@ -16,6 +16,9 @@ public static class ServiceCollectionExtensions
         // Singleton so the DeviceId is resolved from disk once per process.
         services.AddSingleton<IDeviceIdService, DeviceIdService>();
 
+        // Activation gate: the service reads it; the login window writes it.
+        services.AddSingleton<IActivationStore, ActivationStore>();
+
         // Singleton: caches the persisted token; the latest registration's
         // token must be visible to the heartbeat worker across scopes.
         services.AddSingleton<IDeviceTokenService, DeviceTokenService>();

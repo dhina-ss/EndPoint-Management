@@ -1,7 +1,37 @@
 using EMS.Agent.Extensions;
 using EMS.Agent.Helpers;
+using EMS.Agent.Login;
 using EMS.Agent.Logging;
+using EMS.Agent.Services;
 using EMS.Agent.Workers;
+
+// Activation login window, shown after install (launched by the installer)
+// and re-openable from the Start Menu. Runs interactively in the user's
+// session, verifies EMS credentials, and on success writes the activation
+// gate that the background service waits on.
+if (args.Contains("--login"))
+{
+    ConsoleWindowHelper.DetachConsole();
+
+    var loginBuilder = Host.CreateApplicationBuilder(args);
+    loginBuilder.Services.AddAgentServices(loginBuilder.Configuration);
+    loginBuilder.Services.AddHttpClient<IActivationLoginService, ActivationLoginService>((sp, client) =>
+    {
+        var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EMS.Agent.Configuration.ApiSettings>>().Value;
+        if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+        {
+            client.BaseAddress = new Uri(settings.BaseUrl);
+        }
+        client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+    });
+
+    using var loginHost = loginBuilder.Build();
+    var loginService = loginHost.Services.GetRequiredService<IActivationLoginService>();
+
+    ApplicationConfiguration.Initialize();
+    System.Windows.Forms.Application.Run(new LoginForm(loginService));
+    return;
+}
 
 // Foreground-window tracking cannot run inside the Windows Service: services
 // run in Session 0, which has no desktop and cannot see the interactive
