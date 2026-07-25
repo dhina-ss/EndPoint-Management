@@ -143,40 +143,6 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
-    /// Blocks an application from launching on the device. Takes effect on
-    /// the device's next heartbeat.
-    /// </summary>
-    [HttpPost("{id:guid}/blocked-apps")]
-    [RequireDeviceAuth]
-    [ProducesResponseType(typeof(InstalledAppResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<InstalledAppResponse>> BlockApplication(
-        Guid id,
-        [FromBody] BlockApplicationRequest request,
-        CancellationToken cancellationToken)
-    {
-        var blocked = await _applicationService.BlockAsync(id, request, cancellationToken);
-        return blocked is null
-            ? BadRequest(new { message = "Unknown device, or the application has no blockable executable." })
-            : Ok(blocked);
-    }
-
-    /// <summary>Unblocks an application by executable name.</summary>
-    [HttpDelete("{id:guid}/blocked-apps/{executableName}")]
-    [RequireDeviceAuth]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> UnblockApplication(
-        Guid id, string executableName, CancellationToken cancellationToken)
-    {
-        var removed = await _applicationService.UnblockAsync(id, executableName, cancellationToken);
-        return removed ? NoContent() : NotFound();
-    }
-
-    /// <summary>
     /// Latest live-monitoring snapshot (CPU, memory, disk, network, uptime,
     /// battery, online state) for a device.
     /// </summary>

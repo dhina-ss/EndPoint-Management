@@ -74,43 +74,6 @@ export async function fetchInstalledApps(id: string): Promise<InstalledApp[]> {
   return (await response.json()) as InstalledApp[];
 }
 
-export async function blockApplication(
-  id: string,
-  executableName: string,
-  displayName: string,
-): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-apps`, {
-    method: 'POST',
-    headers: {
-      ...credentialHeaders,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ executableName, displayName }),
-  });
-
-  if (!response.ok) {
-    if (response.status === 400) {
-      const body = (await response.json().catch(() => null)) as { message?: string } | null;
-      throw new Error(body?.message ?? 'This application cannot be blocked.');
-    }
-    throwForStatus(response.status);
-  }
-}
-
-export async function unblockApplication(id: string, executableName: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/api/devices/${encodeURIComponent(id)}/blocked-apps/${encodeURIComponent(executableName)}`,
-    {
-      method: 'DELETE',
-      headers: credentialHeaders,
-    },
-  );
-
-  if (!response.ok && response.status !== 404) {
-    throwForStatus(response.status);
-  }
-}
-
 export async function fetchDeviceMetrics(id: string): Promise<DeviceMetrics> {
   const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/metrics`, {
     headers: credentialHeaders,

@@ -95,35 +95,6 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("app_users", (string)null);
                 });
 
-            modelBuilder.Entity("EMS.API.Entities.BlockedApplication", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DeviceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("ExecutableName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("character varying(260)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeviceId", "ExecutableName")
-                        .IsUnique();
-
-                    b.ToTable("blocked_applications", (string)null);
-                });
-
             modelBuilder.Entity("EMS.API.Entities.BlockedWebsite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -379,17 +350,6 @@ namespace EMS.API.Data.Migrations
                 });
 
             modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
-                {
-                    b.HasOne("EMS.API.Entities.Device", "Device")
-                        .WithMany()
-                        .HasForeignKey("DeviceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Device");
-                });
-
-            modelBuilder.Entity("EMS.API.Entities.BlockedApplication", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()

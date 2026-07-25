@@ -22,8 +22,6 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<InstalledApplication> InstalledApplications => Set<InstalledApplication>();
 
-    public DbSet<BlockedApplication> BlockedApplications => Set<BlockedApplication>();
-
     public DbSet<AppUser> AppUsers => Set<AppUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -167,25 +165,6 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(a => a.Device)
                 .WithMany()
                 .HasForeignKey(a => a.DeviceId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<BlockedApplication>(entity =>
-        {
-            entity.ToTable("blocked_applications");
-
-            entity.HasKey(b => b.Id);
-
-            // An executable can be blocked at most once per device.
-            entity.HasIndex(b => new { b.DeviceId, b.ExecutableName })
-                .IsUnique();
-
-            entity.Property(b => b.ExecutableName).HasMaxLength(260).IsRequired();
-            entity.Property(b => b.DisplayName).HasMaxLength(300);
-
-            entity.HasOne(b => b.Device)
-                .WithMany()
-                .HasForeignKey(b => b.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

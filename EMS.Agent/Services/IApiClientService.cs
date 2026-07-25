@@ -37,9 +37,8 @@ public interface IApiClientService
 public sealed record HeartbeatOutcome(
     bool Success,
     bool UsbBlockingEnabled,
-    IReadOnlyList<string> BlockedWebsites,
-    IReadOnlyList<string> BlockedApplications)
+    IReadOnlyList<string> BlockedWebsites)
 {
     public static readonly HeartbeatOutcome Failed =
-        new(false, false, Array.Empty<string>(), Array.Empty<string>());
+        new(false, false, Array.Empty<string>());
 }
