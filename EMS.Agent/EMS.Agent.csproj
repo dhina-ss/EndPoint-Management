@@ -5,6 +5,13 @@
          is already Windows-only, so this only formalizes that. -->
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- GUI subsystem: never allocate a console window. The Worker SDK
+         defaults to a console Exe, which flashes a CMD window whenever the
+         agent is launched outside the Service Control Manager (the post-install
+         login window and the per-user usage-tracker task). WinExe suppresses
+         that entirely; the service still logs to the Event Log and the tracker
+         to its file log. -->
+    <OutputType>WinExe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-EMS.Agent-0fdb5ff2-d827-4c2a-9646-89e123494e24</UserSecretsId>
