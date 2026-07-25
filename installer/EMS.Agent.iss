@@ -187,8 +187,10 @@ var
 begin
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#MyServiceName}', '',
     SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  // sc stop is asynchronous; give the service a moment to release its files.
-  Sleep(3000);
+  // sc stop is asynchronous; wait for it to fully release the exe before
+  // deleting. A generous wait avoids the copy failing on a locked file
+  // (which would leave the OLD build installed).
+  Sleep(6000);
   Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#MyServiceName}', '',
     SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(1000);
@@ -204,6 +206,9 @@ var
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#MyAppExeName} /T', '',
     SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Killing a process is asynchronous too; give Windows time to release the
+  // file handle so the file copy that follows can overwrite the exe.
+  Sleep(2500);
 end;
 
 // Upgrade path: remove the running service and any tracker process before
