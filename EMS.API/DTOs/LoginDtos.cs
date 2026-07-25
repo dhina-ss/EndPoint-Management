@@ -2,12 +2,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EMS.API.DTOs;
 
-/// <summary>Agent activation sign-in: an EMS user's credentials.</summary>
+/// <summary>Agent activation sign-in: an EMS user's employee code and password.</summary>
 public class LoginRequest
 {
+    /// <summary>
+    /// Employee code (the primary sign-in identifier). Username or email are
+    /// also accepted, so an existing user can still sign in either way.
+    /// </summary>
     [Required]
     [MaxLength(256)]
-    public string UsernameOrEmail { get; set; } = string.Empty;
+    public string EmployeeCode { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(128)]

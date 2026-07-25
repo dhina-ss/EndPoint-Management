@@ -7,7 +7,7 @@ namespace EMS.API.Services;
 
 public class AuthService : IAuthService
 {
-    private const string InvalidMessage = "Invalid username or password.";
+    private const string InvalidMessage = "Invalid employee code or password.";
 
     private readonly IUserRepository _repository;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
@@ -26,10 +26,10 @@ public class AuthService : IAuthService
     public async Task<LoginResponse> LoginAsync(
         LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await _repository.GetByUsernameOrEmailAsync(request.UsernameOrEmail.Trim(), cancellationToken);
+        var user = await _repository.GetByLoginIdentifierAsync(request.EmployeeCode.Trim(), cancellationToken);
         if (user is null)
         {
-            _logger.LogWarning("Login failed: no user matching {Identifier}.", request.UsernameOrEmail);
+            _logger.LogWarning("Login failed: no user matching {Identifier}.", request.EmployeeCode);
             return Failed();
         }
 

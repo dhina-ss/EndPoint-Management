@@ -24,18 +24,18 @@ public class ActivationLoginService : IActivationLoginService
     }
 
     public async Task<ActivationLoginResult> LoginAndActivateAsync(
-        string usernameOrEmail, string password, CancellationToken cancellationToken = default)
+        string employeeCode, string password, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(usernameOrEmail) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(password))
         {
-            return new ActivationLoginResult(false, "Enter your username and password.");
+            return new ActivationLoginResult(false, "Enter your employee code and password.");
         }
 
         try
         {
             using var response = await _httpClient.PostAsJsonAsync(
                 _settings.LoginEndpoint,
-                new { usernameOrEmail = usernameOrEmail.Trim(), password },
+                new { employeeCode = employeeCode.Trim(), password },
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -50,7 +50,7 @@ public class ActivationLoginService : IActivationLoginService
                 return new ActivationLoginResult(false, result?.Message ?? "Invalid username or password.");
             }
 
-            _activationStore.Activate(result.Username ?? usernameOrEmail.Trim());
+            _activationStore.Activate(result.Username ?? employeeCode.Trim());
             return new ActivationLoginResult(true, "EMS activated successfully.");
         }
         catch (HttpRequestException ex)

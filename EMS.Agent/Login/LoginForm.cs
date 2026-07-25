@@ -14,7 +14,7 @@ public sealed class LoginForm : Form
 {
     private readonly IActivationLoginService _loginService;
 
-    private readonly TextField _usernameField;
+    private readonly TextField _employeeCodeField;
     private readonly TextField _passwordField;
     private readonly Label _statusLabel;
     private readonly Button _activateButton;
@@ -47,7 +47,7 @@ public sealed class LoginForm : Form
             Location = new Point(20, 46),
         };
 
-        _usernameField = new TextField("Username or email", new Point(20, 78), passwordChar: '\0');
+        _employeeCodeField = new TextField("Employee code", new Point(20, 78), passwordChar: '\0');
         _passwordField = new TextField("Password", new Point(20, 128), passwordChar: '●');
 
         _statusLabel = new Label
@@ -71,7 +71,7 @@ public sealed class LoginForm : Form
 
         Controls.Add(heading);
         Controls.Add(subheading);
-        _usernameField.AddTo(Controls);
+        _employeeCodeField.AddTo(Controls);
         _passwordField.AddTo(Controls);
         Controls.Add(_statusLabel);
         Controls.Add(_activateButton);
@@ -84,7 +84,7 @@ public sealed class LoginForm : Form
         try
         {
             var result = await _loginService.LoginAndActivateAsync(
-                _usernameField.Value, _passwordField.Value);
+                _employeeCodeField.Value, _passwordField.Value);
 
             if (result.Success)
             {
@@ -110,7 +110,7 @@ public sealed class LoginForm : Form
     private void SetBusy(bool busy, string status, Color color)
     {
         _activateButton.Enabled = !busy;
-        _usernameField.Enabled = !busy;
+        _employeeCodeField.Enabled = !busy;
         _passwordField.Enabled = !busy;
         _statusLabel.ForeColor = color;
         _statusLabel.Text = status;
