@@ -50,6 +50,23 @@ export async function setUsbBlocking(id: string, enabled: boolean): Promise<Devi
   return (await response.json()) as Device;
 }
 
+export async function setStoreGating(id: string, enabled: boolean): Promise<Device> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/store-gating`, {
+    method: 'PUT',
+    headers: {
+      ...credentialHeaders,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ enabled }),
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as Device;
+}
+
 export async function fetchAppUsage(id: string): Promise<AppUsageEntry[]> {
   const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/app-usage`, {
     headers: credentialHeaders,

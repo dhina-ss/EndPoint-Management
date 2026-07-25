@@ -19,6 +19,10 @@ public static class ServiceCollectionExtensions
         // Activation gate: the service reads it; the login window writes it.
         services.AddSingleton<IActivationStore, ActivationStore>();
 
+        // Microsoft Store unlock state: the service reads it; the unlock
+        // window writes it after verifying the admin password.
+        services.AddSingleton<IStoreUnlockStore, StoreUnlockStore>();
+
         // Singleton: caches the persisted token; the latest registration's
         // token must be visible to the heartbeat worker across scopes.
         services.AddSingleton<IDeviceTokenService, DeviceTokenService>();

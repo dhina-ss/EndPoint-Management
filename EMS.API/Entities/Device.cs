@@ -53,6 +53,13 @@ public class Device
     /// </summary>
     public bool UsbBlockingEnabled { get; set; }
 
+    /// <summary>
+    /// When true, the agent keeps the Microsoft Store disabled on this device;
+    /// a user must enter an EMS admin password (via the local unlock window)
+    /// to temporarily re-enable it for installs. Applied on the next heartbeat.
+    /// </summary>
+    public bool StoreGatingEnabled { get; set; }
+
     /// <summary>The device's API credential; created at first registration.</summary>
     public DeviceAuthentication? Authentication { get; set; }
 }

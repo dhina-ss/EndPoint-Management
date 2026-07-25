@@ -17,6 +17,12 @@ public class HeartbeatResponse
     public bool UsbBlockingEnabled { get; set; }
 
     /// <summary>
+    /// When true, the agent keeps the Microsoft Store disabled unless a valid
+    /// local unlock is active. Applied after each heartbeat.
+    /// </summary>
+    public bool StoreGatingEnabled { get; set; }
+
+    /// <summary>
     /// Device-specific domains to block, on top of the agent's always-on
     /// default phishing/malware list. The agent merges the two and writes
     /// them to the hosts file after each heartbeat.

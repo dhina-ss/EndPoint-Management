@@ -91,6 +91,25 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
+    /// Enables or disables Microsoft Store gating for a device. When enabled,
+    /// the agent keeps the Store disabled until a user unlocks it locally with
+    /// an EMS admin password. Takes effect on the device's next heartbeat.
+    /// </summary>
+    [HttpPut("{id:guid}/store-gating")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceResponse>> SetStoreGating(
+        Guid id,
+        [FromBody] UsbBlockingUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var device = await _deviceService.SetStoreGatingAsync(id, request.Enabled, cancellationToken);
+        return device is null ? NotFound() : Ok(device);
+    }
+
+    /// <summary>
     /// Returns per-application foreground-usage totals for a device on a
     /// given day (defaults to today, UTC).
     /// </summary>

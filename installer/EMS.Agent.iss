@@ -55,6 +55,9 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; \
 ; The device is dormant until an EMS user signs in, so give them a way to
 ; re-open the activation window if they close it before signing in.
 Name: "{group}\Activate {#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"
+; When Store gating is enabled for the device, a user runs this to enter the
+; EMS admin password and temporarily unlock the Microsoft Store for installs.
+Name: "{group}\Unlock Microsoft Store"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--unlock-store"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]

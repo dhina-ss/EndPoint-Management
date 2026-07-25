@@ -16,15 +16,18 @@ public class HeartbeatService : IHeartbeatService
 
     private readonly IApiClientService _apiClient;
     private readonly ISystemMetricsService _metricsService;
+    private readonly IStoreUnlockStore _storeUnlockStore;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
         IApiClientService apiClient,
         ISystemMetricsService metricsService,
+        IStoreUnlockStore storeUnlockStore,
         ILogger<HeartbeatService> logger)
     {
         _apiClient = apiClient;
         _metricsService = metricsService;
+        _storeUnlockStore = storeUnlockStore;
         _logger = logger;
     }
 
@@ -43,9 +46,34 @@ public class HeartbeatService : IHeartbeatService
                 .Concat(outcome.BlockedWebsites)
                 .ToList();
             HostsFileHelper.ApplyBlocklist(domainsToBlock, _logger);
+
+            ApplyStorePolicy(outcome.StoreGatingEnabled);
         }
 
         return outcome.Success;
+    }
+
+    /// <summary>
+    /// Keeps the Microsoft Store disabled while gating is enabled, except
+    /// during an active local unlock. When gating is off, the Store is left
+    /// enabled.
+    /// </summary>
+    private void ApplyStorePolicy(bool storeGatingEnabled)
+    {
+        if (!storeGatingEnabled)
+        {
+            StoreControlHelper.EnableStore(_logger);
+            return;
+        }
+
+        if (_storeUnlockStore.IsUnlockActive())
+        {
+            StoreControlHelper.EnableStore(_logger);
+        }
+        else
+        {
+            StoreControlHelper.DisableStore(_logger);
+        }
     }
 
     private HeartbeatModel BuildHeartbeat()

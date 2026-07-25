@@ -23,6 +23,7 @@ import MemoryIcon from '@mui/icons-material/Memory';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AppsIcon from '@mui/icons-material/Apps';
 import UsbIcon from '@mui/icons-material/Usb';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import PublicOffIcon from '@mui/icons-material/PublicOff';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
@@ -41,6 +42,7 @@ import {
   fetchDeviceMetrics,
   fetchInstalledApps,
   removeBlockedWebsite,
+  setStoreGating,
   setUsbBlocking,
 } from '../api/devices';
 import {
@@ -147,6 +149,9 @@ export default function DeviceDetailsPage() {
 
   const [usbBlockingPending, setUsbBlockingPending] = useState(false);
   const [usbBlockingError, setUsbBlockingError] = useState<string | null>(null);
+
+  const [storeGatingPending, setStoreGatingPending] = useState(false);
+  const [storeGatingError, setStoreGatingError] = useState<string | null>(null);
 
   const [metrics, setMetrics] = useState<DeviceMetrics | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
@@ -284,6 +289,21 @@ export default function DeviceDetailsPage() {
       setUsbBlockingError(err instanceof Error ? err.message : 'Failed to update USB blocking.');
     } finally {
       setUsbBlockingPending(false);
+    }
+  };
+
+  const handleToggleStoreGating = async (enabled: boolean) => {
+    if (!id) {
+      return;
+    }
+    setStoreGatingPending(true);
+    setStoreGatingError(null);
+    try {
+      setDevice(await setStoreGating(id, enabled));
+    } catch (err) {
+      setStoreGatingError(err instanceof Error ? err.message : 'Failed to update Store gating.');
+    } finally {
+      setStoreGatingPending(false);
     }
   };
 
@@ -550,6 +570,47 @@ export default function DeviceDetailsPage() {
                 disabled={usbBlockingPending}
                 onChange={(event) => void handleToggleUsbBlocking(event.target.checked)}
                 inputProps={{ 'aria-label': 'Toggle USB storage blocking' }}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <StorefrontIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Microsoft Store
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1 }} />
+
+            {storeGatingError && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {storeGatingError}
+              </Alert>
+            )}
+
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box>
+                <Typography variant="body2">
+                  {device.storeGatingEnabled
+                    ? 'Store installs require the EMS admin password'
+                    : 'Store installs are unrestricted'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  When on, the Microsoft Store is disabled on this device. To install, a user runs
+                  "Unlock Microsoft Store" from the Start Menu and enters an EMS admin password, which
+                  re-enables the Store for a short window. Applies within one heartbeat once online.
+                </Typography>
+              </Box>
+              <Switch
+                checked={device.storeGatingEnabled}
+                disabled={storeGatingPending}
+                onChange={(event) => void handleToggleStoreGating(event.target.checked)}
+                inputProps={{ 'aria-label': 'Toggle Microsoft Store gating' }}
               />
             </Stack>
           </CardContent>

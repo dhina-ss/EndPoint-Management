@@ -12,4 +12,7 @@ public interface IDeviceService
 
     /// <summary>Updates the device's USB mass-storage blocking policy. Returns null if the device does not exist.</summary>
     Task<DeviceResponse?> SetUsbBlockingAsync(Guid id, bool enabled, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates the device's Microsoft Store gating policy. Returns null if the device does not exist.</summary>
+    Task<DeviceResponse?> SetStoreGatingAsync(Guid id, bool enabled, CancellationToken cancellationToken = default);
 }

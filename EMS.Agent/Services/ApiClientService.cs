@@ -106,6 +106,7 @@ public class ApiClientService : IApiClientService
                 return new HeartbeatOutcome(
                     true,
                     result?.UsbBlockingEnabled ?? false,
+                    result?.StoreGatingEnabled ?? false,
                     result?.BlockedWebsites ?? Array.Empty<string>());
             }
 
@@ -306,5 +307,5 @@ public class ApiClientService : IApiClientService
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
     private sealed record HeartbeatResult(
         bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
-        IReadOnlyList<string>? BlockedWebsites);
+        bool StoreGatingEnabled, IReadOnlyList<string>? BlockedWebsites);
 }

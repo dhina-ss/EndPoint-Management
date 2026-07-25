@@ -33,6 +33,33 @@ if (args.Contains("--login"))
     return;
 }
 
+// "Unlock Microsoft Store" window, launched from the Start Menu. Runs in the
+// user's session, verifies an EMS admin password, and grants a temporary
+// unlock that the SYSTEM service acts on at its next heartbeat.
+if (args.Contains("--unlock-store"))
+{
+    ConsoleWindowHelper.DetachConsole();
+
+    var unlockBuilder = Host.CreateApplicationBuilder(args);
+    unlockBuilder.Services.AddAgentServices(unlockBuilder.Configuration);
+    unlockBuilder.Services.AddHttpClient<IStoreUnlockService, StoreUnlockService>((sp, client) =>
+    {
+        var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EMS.Agent.Configuration.ApiSettings>>().Value;
+        if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+        {
+            client.BaseAddress = new Uri(settings.BaseUrl);
+        }
+        client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+    });
+
+    using var unlockHost = unlockBuilder.Build();
+    var unlockService = unlockHost.Services.GetRequiredService<IStoreUnlockService>();
+
+    ApplicationConfiguration.Initialize();
+    System.Windows.Forms.Application.Run(new StoreUnlockForm(unlockService));
+    return;
+}
+
 // Foreground-window tracking cannot run inside the Windows Service: services
 // run in Session 0, which has no desktop and cannot see the interactive
 // user's foreground window (that isolation is deliberate, since Windows

@@ -44,4 +44,6 @@ public class DeviceResponse
     public DateTime? LastHeartbeatTime { get; set; }
 
     public bool UsbBlockingEnabled { get; set; }
+
+    public bool StoreGatingEnabled { get; set; }
 }

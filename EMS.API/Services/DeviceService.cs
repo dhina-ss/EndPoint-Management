@@ -95,6 +95,24 @@ public class DeviceService : IDeviceService
         return MapToResponse(device);
     }
 
+    public async Task<DeviceResponse?> SetStoreGatingAsync(
+        Guid id, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var device = await _deviceRepository.GetTrackedByIdAsync(id, cancellationToken);
+        if (device is null)
+        {
+            return null;
+        }
+
+        device.StoreGatingEnabled = enabled;
+        await _deviceRepository.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Microsoft Store gating set to {Enabled} for device {DeviceId}.", enabled, device.DeviceId);
+
+        return MapToResponse(device);
+    }
+
     private static void ApplyInventory(Device device, DeviceRegisterRequest request, DateTime utcNow)
     {
         device.DeviceName = request.DeviceName;
@@ -137,7 +155,8 @@ public class DeviceService : IDeviceService
             UpdatedDate = device.UpdatedDate,
             LastSeen = device.LastSeen,
             LastHeartbeatTime = device.LastHeartbeatTime,
-            UsbBlockingEnabled = device.UsbBlockingEnabled
+            UsbBlockingEnabled = device.UsbBlockingEnabled,
+            StoreGatingEnabled = device.StoreGatingEnabled
         };
     }
 }
