@@ -106,8 +106,7 @@ public class ApiClientService : IApiClientService
                 return new HeartbeatOutcome(
                     true,
                     result?.UsbBlockingEnabled ?? false,
-                    result?.BlockedWebsites ?? Array.Empty<string>(),
-                    result?.BlockedApplications ?? Array.Empty<string>());
+                    result?.BlockedWebsites ?? Array.Empty<string>());
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -307,5 +306,5 @@ public class ApiClientService : IApiClientService
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
     private sealed record HeartbeatResult(
         bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
-        IReadOnlyList<string>? BlockedWebsites, IReadOnlyList<string>? BlockedApplications);
+        IReadOnlyList<string>? BlockedWebsites);
 }

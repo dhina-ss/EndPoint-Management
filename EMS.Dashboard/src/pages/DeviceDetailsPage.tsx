@@ -35,7 +35,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import InputAdornment from '@mui/material/InputAdornment';
 import {
   addBlockedWebsite,
-  blockApplication,
   fetchAppUsage,
   fetchBlockedWebsites,
   fetchDevice,
@@ -43,7 +42,6 @@ import {
   fetchInstalledApps,
   removeBlockedWebsite,
   setUsbBlocking,
-  unblockApplication,
 } from '../api/devices';
 import {
   formatDuration,
@@ -155,8 +153,7 @@ export default function DeviceDetailsPage() {
 
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
   const [appSearch, setAppSearch] = useState('');
-  const [appBlockPending, setAppBlockPending] = useState<string | null>(null);
-  const [appBlockError, setAppBlockError] = useState<string | null>(null);
+  const [appsError, setAppsError] = useState<string | null>(null);
 
   const [blockedSites, setBlockedSites] = useState<BlockedWebsite[]>([]);
   const [newDomain, setNewDomain] = useState('');
@@ -225,7 +222,7 @@ export default function DeviceDetailsPage() {
     try {
       setInstalledApps(await fetchInstalledApps(id));
     } catch (err) {
-      setAppBlockError(err instanceof Error ? err.message : 'Failed to load installed applications.');
+      setAppsError(err instanceof Error ? err.message : 'Failed to load installed applications.');
     }
   }, [id]);
 
@@ -236,27 +233,6 @@ export default function DeviceDetailsPage() {
     void loadMetrics();
     void loadInstalledApps();
   }, [loadDevice, loadAppUsage, loadBlockedSites, loadMetrics, loadInstalledApps]);
-
-  const handleToggleAppBlock = async (app: InstalledApp, shouldBlock: boolean) => {
-    if (!id || !app.executableName) {
-      return;
-    }
-    setAppBlockPending(app.executableName);
-    setAppBlockError(null);
-    try {
-      if (shouldBlock) {
-        await blockApplication(id, app.executableName, app.name);
-      } else {
-        await unblockApplication(id, app.executableName);
-      }
-      // Re-read so entries for uninstalled-but-blocked apps stay accurate.
-      await loadInstalledApps();
-    } catch (err) {
-      setAppBlockError(err instanceof Error ? err.message : 'Failed to update the application block.');
-    } finally {
-      setAppBlockPending(null);
-    }
-  };
 
   // Live monitoring polls on its own so the panel stays current without the
   // user pressing Refresh. The agent reports every 60s; polling at 30s keeps
@@ -676,14 +652,6 @@ export default function DeviceDetailsPage() {
                   Installed Applications
                 </Typography>
                 <Chip label={installedApps.length} size="small" />
-                {installedApps.some((a) => a.isBlocked) && (
-                  <Chip
-                    label={`${installedApps.filter((a) => a.isBlocked).length} blocked`}
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                  />
-                )}
               </Stack>
               <TextField
                 size="small"
@@ -703,9 +671,9 @@ export default function DeviceDetailsPage() {
             </Stack>
             <Divider sx={{ mb: 1 }} />
 
-            {appBlockError && (
+            {appsError && (
               <Alert severity="error" sx={{ mb: 1.5 }}>
-                {appBlockError}
+                {appsError}
               </Alert>
             )}
 
@@ -727,42 +695,22 @@ export default function DeviceDetailsPage() {
                       .some((v) => v.toLowerCase().includes(term));
                   })
                   .map((app) => (
-                    <Stack
+                    <Box
                       key={`${app.id}-${app.executableName ?? app.name}`}
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      spacing={2}
                       sx={{ py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
                     >
-                      <Box sx={{ minWidth: 0 }}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <Typography variant="body2" noWrap>
-                            {app.name}
-                          </Typography>
-                          {app.isStoreApp && <Chip label="Store" size="small" variant="outlined" />}
-                          {app.isBlocked && <Chip label="Blocked" size="small" color="error" />}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary">
-                          {[app.publisher, app.version, app.executableName]
-                            .filter(Boolean)
-                            .join(' · ') || '—'}
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" noWrap>
+                          {app.name}
                         </Typography>
-                      </Box>
-
-                      {app.canBlock ? (
-                        <Switch
-                          checked={app.isBlocked}
-                          disabled={appBlockPending === app.executableName}
-                          onChange={(event) => void handleToggleAppBlock(app, event.target.checked)}
-                          inputProps={{ 'aria-label': `Block ${app.name}` }}
-                        />
-                      ) : (
-                        <Typography variant="caption" color="text.secondary" sx={{ pr: 1 }}>
-                          No executable
-                        </Typography>
-                      )}
-                    </Stack>
+                        {app.isStoreApp && <Chip label="Store" size="small" variant="outlined" />}
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">
+                        {[app.publisher, app.version, app.executableName]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </Typography>
+                    </Box>
                   ))}
               </Box>
             )}

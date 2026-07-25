@@ -27,7 +27,7 @@ public class InstalledAppsReportRequest
     public List<InstalledAppDto> Applications { get; set; } = new();
 }
 
-/// <summary>Installed application as shown in the dashboard.</summary>
+/// <summary>Installed application as shown in the dashboard (read-only).</summary>
 public class InstalledAppResponse
 {
     public Guid Id { get; set; }
@@ -41,24 +41,4 @@ public class InstalledAppResponse
     public string? ExecutableName { get; set; }
 
     public bool IsStoreApp { get; set; }
-
-    /// <summary>True when this app is currently blocked on the device.</summary>
-    public bool IsBlocked { get; set; }
-
-    /// <summary>
-    /// False when the app has no resolvable executable (typically Store
-    /// apps), so the dashboard can explain why blocking is unavailable.
-    /// </summary>
-    public bool CanBlock { get; set; }
-}
-
-/// <summary>Request body for blocking an application on a device.</summary>
-public class BlockApplicationRequest
-{
-    [Required]
-    [MaxLength(260)]
-    public string ExecutableName { get; set; } = string.Empty;
-
-    [MaxLength(300)]
-    public string? DisplayName { get; set; }
 }
