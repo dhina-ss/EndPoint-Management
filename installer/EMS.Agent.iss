@@ -14,7 +14,10 @@
 #define MyServiceName "EMSAgent"
 #define MyServiceDisplayName "EMS Endpoint Agent"
 #define MyUsageTaskName "EMS App Usage Tracker"
-#define PublishDir "..\EMS.Agent\bin\Release\net8.0\win-x64\publish"
+; NOTE: the agent targets net8.0-windows (WinForms + GUI subsystem, no console),
+; so the publish output lives under net8.0-windows - NOT net8.0. Pointing this at
+; the old net8.0 folder silently ships a stale console-subsystem build.
+#define PublishDir "..\EMS.Agent\bin\Release\net8.0-windows\win-x64\publish"
 
 [Setup]
 ; Never change AppId between versions - it is how upgrades find the install.
