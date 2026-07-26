@@ -8,7 +8,7 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "Dhinakaran Sekar"
 #define MyAppExeName "EMS.Agent.exe"
 #define MyServiceName "EMSAgent"
@@ -181,6 +181,44 @@ begin
     SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+// Deletes leftover retired-exe copies from earlier upgrades (best-effort;
+// silently skips any that are still locked by a running old process).
+procedure CleanupRetiredExes();
+var
+  findRec: TFindRec;
+begin
+  if FindFirst(ExpandConstant('{app}\EMS.Agent.old-*.exe'), findRec) then
+  begin
+    try
+      repeat
+        DeleteFile(ExpandConstant('{app}\') + findRec.Name);
+      until not FindNext(findRec);
+    finally
+      FindClose(findRec);
+    end;
+  end;
+end;
+
+// Renames the existing exe aside so the fresh copy can be written even when
+// the old exe is still locked by a running service/task. Windows permits
+// renaming a running executable (the open handle tracks the file object, not
+// its name), so this guarantees the new build actually replaces the old one -
+// which a plain overwrite cannot when the file is in use.
+procedure RetireOldExe();
+var
+  target, retired: string;
+begin
+  target := ExpandConstant('{app}\{#MyAppExeName}');
+  if not FileExists(target) then
+    Exit;
+
+  retired := ExpandConstant('{app}\EMS.Agent.old-')
+    + GetDateTimeString('yyyymmddhhnnss', #0, #0) + '.exe';
+
+  if not RenameFile(target, retired) then
+    Log('Could not retire the old exe; the file copy may fail if it is locked.');
+end;
+
 procedure StopAndDeleteService();
 var
   ResultCode: Integer;
@@ -220,6 +258,10 @@ begin
   begin
     StopAndDeleteService();
     StopUsageTrackerProcess();
+    // Even after stopping, a lingering handle can keep the exe locked; rename
+    // it aside so the new build is guaranteed to be written.
+    CleanupRetiredExes();
+    RetireOldExe();
   end;
 
   if CurStep = ssPostInstall then
