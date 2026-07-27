@@ -37,10 +37,13 @@ public class ApplicationInventoryService : IApplicationInventoryService
             {
                 Id = Guid.NewGuid(),
                 DeviceId = device.Id,
-                Name = a.Name.Trim(),
-                Version = a.Version,
-                Publisher = a.Publisher,
-                ExecutableName = NormalizeExecutable(a.ExecutableName),
+                // Truncate to the column limits so one over-length field (e.g. a
+                // Store app's long certificate-subject Vendor) can't fail the
+                // whole report and freeze the inventory.
+                Name = Truncate(a.Name.Trim(), 300)!,
+                Version = Truncate(a.Version, 100),
+                Publisher = Truncate(a.Publisher, 200),
+                ExecutableName = Truncate(NormalizeExecutable(a.ExecutableName), 260),
                 IsStoreApp = a.IsStoreApp,
                 ReportedAt = utcNow
             })
@@ -82,6 +85,10 @@ public class ApplicationInventoryService : IApplicationInventoryService
         ExecutableName = app.ExecutableName,
         IsStoreApp = app.IsStoreApp
     };
+
+    /// <summary>Caps a value at the column limit; null passes through.</summary>
+    private static string? Truncate(string? value, int maxLength)
+        => value is not null && value.Length > maxLength ? value[..maxLength] : value;
 
     /// <summary>Reduces whatever was supplied to a bare lowercase executable name.</summary>
     private static string? NormalizeExecutable(string? raw)
