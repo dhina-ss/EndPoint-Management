@@ -896,8 +896,8 @@ export default function DeviceDetailsPage() {
 
             {installedApps.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-                No application inventory reported yet. It arrives with the device's next inventory
-                cycle (every 10 minutes).
+                No application inventory reported yet. It refreshes on the device's hourly scan
+                (and immediately after any install or uninstall).
               </Typography>
             ) : (
               <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>

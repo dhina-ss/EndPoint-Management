@@ -17,6 +17,10 @@ public class AgentWorker : BackgroundService
     private readonly ApiSettings _apiSettings;
     private readonly ILogger<AgentWorker> _logger;
 
+    // When the installed-app list was last reported. Null forces a scan on the
+    // first cycle after startup; thereafter it runs on its own hourly cadence.
+    private DateTime? _lastInstalledAppsReport;
+
     public AgentWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<ApiSettings> apiSettings,
@@ -89,9 +93,15 @@ public class AgentWorker : BackgroundService
                     _apiSettings.PollingIntervalMinutes);
             }
 
-            // Installed software changes rarely, so it rides the same slow
-            // inventory cadence rather than the 60s heartbeat.
-            await ReportInstalledAppsAsync(apiClient, stoppingToken);
+            // Installed software changes rarely, so the app scan runs on its
+            // own slower cadence (default hourly), independent of this cycle.
+            if (ShouldReportInstalledApps())
+            {
+                if (await ReportInstalledAppsAsync(apiClient, stoppingToken))
+                {
+                    _lastInstalledAppsReport = DateTime.UtcNow;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -106,23 +116,42 @@ public class AgentWorker : BackgroundService
     }
 
     /// <summary>
+    /// True on the first cycle, then once the configured installed-apps
+    /// interval has elapsed since the last successful report.
+    /// </summary>
+    private bool ShouldReportInstalledApps()
+    {
+        if (_lastInstalledAppsReport is null)
+        {
+            return true;
+        }
+
+        var interval = TimeSpan.FromMinutes(Math.Max(1, _apiSettings.InstalledAppsIntervalMinutes));
+        return DateTime.UtcNow - _lastInstalledAppsReport.Value >= interval;
+    }
+
+    /// <summary>
     /// Scans and uploads installed software. Isolated from the main cycle so
     /// a scan failure never prevents the hardware inventory from reporting.
+    /// Returns true only when the list was successfully reported.
     /// </summary>
-    private async Task ReportInstalledAppsAsync(IApiClientService apiClient, CancellationToken stoppingToken)
+    private async Task<bool> ReportInstalledAppsAsync(IApiClientService apiClient, CancellationToken stoppingToken)
     {
         try
         {
             var applications = InstalledAppsHelper.Collect(_logger);
             if (applications.Count == 0)
             {
-                return;
+                return false;
             }
 
             if (await apiClient.SendInstalledAppsAsync(applications, stoppingToken))
             {
                 _logger.LogInformation("Reported {Count} installed application(s).", applications.Count);
+                return true;
             }
+
+            return false;
         }
         catch (OperationCanceledException)
         {
@@ -131,6 +160,7 @@ public class AgentWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Installed-application scan failed for this cycle.");
+            return false;
         }
     }
 }

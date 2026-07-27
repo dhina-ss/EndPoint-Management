@@ -1,4 +1,5 @@
 using EMS.Agent.Configuration;
+using EMS.Agent.Helpers;
 using EMS.Agent.Models;
 using EMS.Agent.Services;
 using Microsoft.Extensions.Options;
@@ -80,6 +81,10 @@ public class CommandWorker : BackgroundService
                 stoppingToken.ThrowIfCancellationRequested();
                 await RunOneAsync(command, executor, apiClient, stoppingToken);
             }
+
+            // A command may have installed or removed software, so refresh the
+            // inventory now instead of waiting for the next hourly scan.
+            await RefreshInstalledAppsAsync(apiClient, stoppingToken);
         }
         catch (OperationCanceledException)
         {
@@ -124,4 +129,29 @@ public class CommandWorker : BackgroundService
             },
             stoppingToken);
     }
+
+    /// <summary>
+    /// Re-scans installed software after a batch of commands so an install or
+    /// uninstall is reflected in the dashboard promptly. Best-effort.
+    /// </summary>
+    private async Task RefreshInstalledAppsAsync(IApiClientService apiClient, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var apps = InstalledAppsHelper.Collect(_logger);
+            if (apps.Count > 0)
+            {
+                await apiClient.SendInstalledAppsAsync(apps, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Post-command installed-apps refresh failed.");
+        }
+    }
 }
+

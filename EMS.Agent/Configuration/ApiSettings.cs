@@ -37,6 +37,13 @@ public class ApiSettings
     /// <summary>How often the agent collects and reports inventory, in minutes.</summary>
     public int PollingIntervalMinutes { get; set; } = 10;
 
+    /// <summary>
+    /// How often the agent re-scans and reports the installed-application list,
+    /// in minutes. Installed software changes rarely, so this runs on a slower
+    /// cadence than the hardware inventory cycle.
+    /// </summary>
+    public int InstalledAppsIntervalMinutes { get; set; } = 60;
+
     /// <summary>Relative path of the app-usage report endpoint.</summary>
     public string AppUsageEndpoint { get; set; } = "/api/devices/app-usage";
 
