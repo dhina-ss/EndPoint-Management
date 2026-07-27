@@ -8,7 +8,7 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.5"
 #define MyAppPublisher "Dhinakaran Sekar"
 #define MyAppExeName "EMS.Agent.exe"
 #define MyServiceName "EMSAgent"
@@ -54,6 +54,14 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; \
     Excludes: "{#MyAppExeName},appsettings.json,appsettings.Development.json,*.pdb"; \
     Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 
+[Dirs]
+; Shared state (activation.json, store-unlock.json) lives here. The activation
+; and Store-unlock windows run in the user's NON-admin session and must write
+; it, while the SYSTEM service reads it - so grant the Users group Modify.
+; Without this, a file an elevated run created is read-only to standard users
+; and activation fails with "Access to the path ... is denied".
+Name: "{commonappdata}\EMS.Agent"; Permissions: users-modify
+
 [Icons]
 ; The device is dormant until an EMS user signs in, so give them a way to
 ; re-open the activation window if they close it before signing in.
@@ -64,6 +72,11 @@ Name: "{group}\Unlock Microsoft Store"; Filename: "{app}\{#MyAppExeName}"; Param
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]
+; Reset the data folder's ACL so the Users group can modify EXISTING files too
+; (the [Dirs] grant only covers the folder and new children). Fixes an
+; activation.json a prior elevated run left owned by Administrators and
+; read-only for the signed-in user. S-1-5-32-545 = the built-in Users group.
+Filename: "{sys}\icacls.exe"; Parameters: """{commonappdata}\EMS.Agent"" /grant *S-1-5-32-545:(OI)(CI)M /T /C /Q"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "create {#MyServiceName} binPath= ""{app}\{#MyAppExeName}"" start= auto DisplayName= ""{#MyServiceDisplayName}"""; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "description {#MyServiceName} ""Collects device inventory and heartbeat data for the Endpoint Management System."""; Flags: runhidden
 ; Restart automatically if the service ever crashes (3 restarts, 1 min apart, reset counter daily).
