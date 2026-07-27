@@ -94,7 +94,7 @@ public static class AppUninstallHelper
             return (new UninstallPlan("msiexec.exe", $"/x {productCode} /qn /norestart"), null);
         }
 
-        // Otherwise only a QuietUninstallString is safe to run unattended.
+        // A QuietUninstallString is already unattended - use it verbatim.
         if (!string.IsNullOrWhiteSpace(entry.QuietUninstallString))
         {
             var (file, args) = SplitCommandLine(entry.QuietUninstallString);
@@ -104,9 +104,40 @@ public static class AppUninstallHelper
             }
         }
 
-        return (null,
-            $"'{entry.DisplayName}' has no silent uninstall method (no MSI product code or QuietUninstallString); " +
-            "it cannot be removed unattended.");
+        // No MSI code and no QuietUninstallString (e.g. WinRAR, most NSIS/Inno
+        // apps). Run the interactive uninstaller WITH a best-effort silent
+        // switch - never bare, which would pop a dialog and hang in Session 0.
+        // The per-command timeout still guards a switch the uninstaller ignores.
+        if (!string.IsNullOrWhiteSpace(entry.UninstallString))
+        {
+            var (file, existingArgs) = SplitCommandLine(entry.UninstallString);
+            if (!string.IsNullOrWhiteSpace(file))
+            {
+                var silent = GuessSilentSwitch(file);
+                var args = string.IsNullOrWhiteSpace(existingArgs) ? silent : $"{existingArgs} {silent}";
+                return (new UninstallPlan(file, args), null);
+            }
+        }
+
+        return (null, $"'{entry.DisplayName}' has no uninstall information in the registry.");
+    }
+
+    /// <summary>
+    /// Best-effort silent switch for an EXE uninstaller. Inno Setup uninstallers
+    /// (unins###.exe) take /VERYSILENT; NSIS and most others (including WinRAR)
+    /// take /S. This is a heuristic - the command timeout backs it up.
+    /// </summary>
+    public static string GuessSilentSwitch(string uninstallerPath)
+    {
+        // Inno Setup names its uninstaller "unins000.exe" (unins + digits) -
+        // not to be confused with a generic "uninstall.exe" (WinRAR, NSIS).
+        var name = Path.GetFileName(uninstallerPath);
+        if (Regex.IsMatch(name, @"^unins\d", RegexOptions.IgnoreCase))
+        {
+            return "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
+        }
+
+        return "/S";
     }
 
     /// <summary>Pulls a {GUID} product code out of a key name or msiexec command.</summary>
@@ -142,10 +173,42 @@ public static class AppUninstallHelper
             return (value.Trim('"'), string.Empty);
         }
 
+        // Unquoted. A registry UninstallString is often a bare path that itself
+        // contains spaces (e.g. "C:\Program Files\WinRAR\uninstall.exe"), so a
+        // naive first-space split is wrong. Split at the end of the executable
+        // instead: the first ".exe" followed by a space or end-of-string.
+        var exe = FindExecutableEnd(value);
+        if (exe > 0)
+        {
+            return (value[..exe], value[exe..].Trim());
+        }
+
         var space = value.IndexOf(' ');
         return space < 0
             ? (value, string.Empty)
             : (value[..space], value[(space + 1)..].Trim());
+    }
+
+    /// <summary>Index just past the first ".exe" token boundary, or -1.</summary>
+    private static int FindExecutableEnd(string value)
+    {
+        var search = 0;
+        while (true)
+        {
+            var idx = value.IndexOf(".exe", search, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+            {
+                return -1;
+            }
+
+            var end = idx + 4;
+            if (end == value.Length || value[end] == ' ')
+            {
+                return end;
+            }
+
+            search = end;
+        }
     }
 
     private static UninstallEntry? FindDesktopEntry(string appName, string? version, ILogger logger)

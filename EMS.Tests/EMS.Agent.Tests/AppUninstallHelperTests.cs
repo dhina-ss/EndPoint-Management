@@ -64,19 +64,45 @@ public class AppUninstallHelperTests
     }
 
     [Fact]
-    public void PlanUninstall_OnlyInteractiveUninstallString_FailsRatherThanHang()
+    public void PlanUninstall_WinRarStyleExe_AppendsSilentSwitch()
     {
-        // No MSI code and no QuietUninstallString: running the bare interactive
-        // uninstaller would hang in Session 0, so we refuse it.
+        // WinRAR: no MSI code, no QuietUninstallString, bare uninstall.exe. We
+        // must run it WITH /S (never bare, which hangs in Session 0).
         var entry = new AppUninstallHelper.UninstallEntry(
-            "Legacy App", "2.0", "LegacyApp",
-            "\"C:\\Program Files\\Legacy\\uninst.exe\"", null);
+            "WinRAR 7.13 (64-bit)", "7.13.0", "WinRAR archiver",
+            "C:\\Program Files\\WinRAR\\uninstall.exe", null);
+
+        var (plan, reason) = AppUninstallHelper.PlanUninstall(entry);
+
+        Assert.Null(reason);
+        Assert.NotNull(plan);
+        Assert.Equal("C:\\Program Files\\WinRAR\\uninstall.exe", plan!.FileName);
+        Assert.Equal("/S", plan.Arguments);
+    }
+
+    [Fact]
+    public void PlanUninstall_InnoSetupUninstaller_UsesVerySilent()
+    {
+        var entry = new AppUninstallHelper.UninstallEntry(
+            "Some Inno App", "1.0", "SomeInnoApp_is1",
+            "\"C:\\Program Files\\SomeApp\\unins000.exe\"", null);
+
+        var (plan, reason) = AppUninstallHelper.PlanUninstall(entry);
+
+        Assert.Null(reason);
+        Assert.NotNull(plan);
+        Assert.Contains("/VERYSILENT", plan!.Arguments);
+    }
+
+    [Fact]
+    public void PlanUninstall_NoUninstallInfo_Fails()
+    {
+        var entry = new AppUninstallHelper.UninstallEntry("Ghost App", "1.0", "Ghost", null, null);
 
         var (plan, reason) = AppUninstallHelper.PlanUninstall(entry);
 
         Assert.Null(plan);
         Assert.NotNull(reason);
-        Assert.Contains("no silent uninstall", reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
