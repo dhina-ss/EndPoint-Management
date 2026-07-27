@@ -80,6 +80,42 @@ public class DeviceCommandServiceTests
     }
 
     [Fact]
+    public async Task DispatchPending_StaleDispatchedCommand_IsHandedOutAgain()
+    {
+        // Dispatched 20 min ago and never reported (agent crashed/replaced) -> retry.
+        var commands = new FakeCommandRepo();
+        commands.Items.Add(new DeviceCommand
+        {
+            Id = Guid.NewGuid(), DeviceId = DeviceInternalId, TargetAppName = "WinRAR",
+            Type = DeviceCommandType.Uninstall, Status = DeviceCommandStatus.Dispatched,
+            DispatchedAt = DateTime.UtcNow.AddMinutes(-20)
+        });
+        var service = CreateService(commands, DeviceRepo(), new FakeInventoryRepo(), new FakePackageRepo());
+
+        var dispatched = await service.DispatchPendingAsync(DeviceIdString);
+
+        Assert.Single(dispatched!);
+        Assert.True(commands.Items[0].DispatchedAt > DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task DispatchPending_RecentlyDispatchedCommand_IsNotRepeated()
+    {
+        var commands = new FakeCommandRepo();
+        commands.Items.Add(new DeviceCommand
+        {
+            Id = Guid.NewGuid(), DeviceId = DeviceInternalId, TargetAppName = "WinRAR",
+            Type = DeviceCommandType.Uninstall, Status = DeviceCommandStatus.Dispatched,
+            DispatchedAt = DateTime.UtcNow.AddMinutes(-2)
+        });
+        var service = CreateService(commands, DeviceRepo(), new FakeInventoryRepo(), new FakePackageRepo());
+
+        var dispatched = await service.DispatchPendingAsync(DeviceIdString);
+
+        Assert.Empty(dispatched!);
+    }
+
+    [Fact]
     public async Task RecordResult_Failure_SetsFailedStatusAndMessage()
     {
         var command = new DeviceCommand
@@ -138,16 +174,24 @@ public class DeviceCommandServiceTests
             => Task.FromResult<IReadOnlyList<DeviceCommand>>(
                 Items.Where(c => c.DeviceId == deviceId).Take(limit).ToList());
 
-        public Task<IReadOnlyList<DeviceCommand>> GetPendingForDeviceAsync(Guid deviceId, CancellationToken ct = default)
+        public Task<IReadOnlyList<DeviceCommand>> GetDispatchableForDeviceAsync(
+            Guid deviceId, DateTime staleDispatchBefore, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<DeviceCommand>>(
-                Items.Where(c => c.DeviceId == deviceId && c.Status == DeviceCommandStatus.Pending).ToList());
+                Items.Where(c => c.DeviceId == deviceId &&
+                    (c.Status == DeviceCommandStatus.Pending ||
+                        (c.Status == DeviceCommandStatus.Dispatched
+                            && c.DispatchedAt != null
+                            && c.DispatchedAt < staleDispatchBefore))).ToList());
 
         public Task<DeviceCommand?> GetTrackedByIdAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult(Items.FirstOrDefault(c => c.Id == id));
 
-        public Task<bool> HasActiveCommandForAppAsync(Guid deviceId, string appName, CancellationToken ct = default)
+        public Task<bool> HasActiveCommandForAppAsync(
+            Guid deviceId, string appName, DateTime staleDispatchBefore, CancellationToken ct = default)
             => Task.FromResult(Items.Any(c => c.DeviceId == deviceId && c.TargetAppName == appName
-                && (c.Status == DeviceCommandStatus.Pending || c.Status == DeviceCommandStatus.Dispatched)));
+                && (c.Status == DeviceCommandStatus.Pending
+                    || (c.Status == DeviceCommandStatus.Dispatched
+                        && (c.DispatchedAt == null || c.DispatchedAt >= staleDispatchBefore)))));
 
         public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
     }

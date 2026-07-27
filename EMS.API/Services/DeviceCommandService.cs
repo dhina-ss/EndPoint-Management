@@ -8,6 +8,11 @@ public class DeviceCommandService : IDeviceCommandService
 {
     private const int HistoryLimit = 50;
 
+    // A command handed to an agent should finish within the agent's per-command
+    // timeout (10 min). If it stays Dispatched well past that, the agent likely
+    // died or was replaced mid-run, so it becomes eligible to hand out again.
+    private static readonly TimeSpan StaleDispatchAfter = TimeSpan.FromMinutes(15);
+
     private readonly IDeviceCommandRepository _commands;
     private readonly IDeviceRepository _devices;
     private readonly IApplicationInventoryRepository _inventory;
@@ -43,8 +48,11 @@ public class DeviceCommandService : IDeviceCommandService
             return new EnqueueCommandResult(EnqueueCommandOutcome.AppNotFound, null, "Application not found on this device.");
         }
 
-        // Don't stack duplicate uninstalls for the same app while one is in flight.
-        if (await _commands.HasActiveCommandForAppAsync(deviceInternalId, app.Name, cancellationToken))
+        // Don't stack duplicate uninstalls for the same app while one is in
+        // flight. A stale Dispatched command (agent died mid-run) does not
+        // count, so the user can re-queue it.
+        var staleBefore = DateTime.UtcNow - StaleDispatchAfter;
+        if (await _commands.HasActiveCommandForAppAsync(deviceInternalId, app.Name, staleBefore, cancellationToken))
         {
             return new EnqueueCommandResult(
                 EnqueueCommandOutcome.Duplicate, null, $"A command for '{app.Name}' is already in progress.");
@@ -129,20 +137,32 @@ public class DeviceCommandService : IDeviceCommandService
             return null;
         }
 
-        var pending = await _commands.GetPendingForDeviceAsync(device.Id, cancellationToken);
+        var utcNow = DateTime.UtcNow;
+        var staleBefore = utcNow - StaleDispatchAfter;
+
+        var pending = await _commands.GetDispatchableForDeviceAsync(device.Id, staleBefore, cancellationToken);
         if (pending.Count == 0)
         {
             return Array.Empty<PendingCommandDto>();
         }
 
-        var utcNow = DateTime.UtcNow;
         var dtos = new List<PendingCommandDto>(pending.Count);
 
         foreach (var command in pending)
         {
-            // Flip to Dispatched on a tracked copy so a second poll won't re-hand it.
+            // (Re-)stamp Dispatched on a tracked copy so a second poll within the
+            // stale window won't re-hand it, but a crashed run eventually will.
             var tracked = await _commands.GetTrackedByIdAsync(command.Id, cancellationToken);
-            if (tracked is null || tracked.Status != DeviceCommandStatus.Pending)
+            if (tracked is null)
+            {
+                continue;
+            }
+
+            var isEligible = tracked.Status == DeviceCommandStatus.Pending
+                || (tracked.Status == DeviceCommandStatus.Dispatched
+                    && tracked.DispatchedAt is not null
+                    && tracked.DispatchedAt < staleBefore);
+            if (!isEligible)
             {
                 continue;
             }
