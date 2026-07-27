@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EMS.Agent.Helpers;
 
 namespace EMS.Agent.Services;
 
@@ -39,7 +40,7 @@ public class StoreUnlockStore : IStoreUnlockStore
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
 
             var document = new UnlockDocument { UnlockedUntil = DateTime.UtcNow.Add(duration) };
-            File.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
+            UserWritableFile.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
 
             _logger.LogInformation("Microsoft Store unlocked until {Until} (UTC).", document.UnlockedUntil);
         }

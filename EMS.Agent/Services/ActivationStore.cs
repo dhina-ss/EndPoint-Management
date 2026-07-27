@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EMS.Agent.Helpers;
 
 namespace EMS.Agent.Services;
 
@@ -42,7 +43,7 @@ public class ActivationStore : IActivationStore
                 ActivatedAt = DateTime.UtcNow
             };
 
-            File.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
+            UserWritableFile.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
             _logger.LogInformation("Device activated by {User}.", activatedBy);
         }
         catch (Exception ex)
