@@ -1,21 +1,19 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EMS.API.DTOs;
 
-/// <summary>One application in the agent's inventory report.</summary>
+/// <summary>
+/// One application in the agent's inventory report. Deliberately unvalidated:
+/// a single over-length field (e.g. a Store app whose Vendor is a long
+/// certificate subject) must never reject the whole batch with a 400 and leave
+/// the inventory stale. The service sanitizes and truncates on ingestion.
+/// </summary>
 public class InstalledAppDto
 {
-    [Required]
-    [MaxLength(300)]
     public string Name { get; set; } = string.Empty;
 
-    [MaxLength(100)]
     public string? Version { get; set; }
 
-    [MaxLength(200)]
     public string? Publisher { get; set; }
 
-    [MaxLength(260)]
     public string? ExecutableName { get; set; }
 
     public bool IsStoreApp { get; set; }
