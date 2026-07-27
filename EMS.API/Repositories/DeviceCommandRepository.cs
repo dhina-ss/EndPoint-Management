@@ -30,13 +30,17 @@ public class DeviceCommandRepository : IDeviceCommandRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DeviceCommand>> GetPendingForDeviceAsync(
-        Guid deviceId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DeviceCommand>> GetDispatchableForDeviceAsync(
+        Guid deviceId, DateTime staleDispatchBefore, CancellationToken cancellationToken = default)
     {
         return await _dbContext.DeviceCommands
             .AsNoTracking()
             .Include(c => c.Package)
-            .Where(c => c.DeviceId == deviceId && c.Status == DeviceCommandStatus.Pending)
+            .Where(c => c.DeviceId == deviceId &&
+                (c.Status == DeviceCommandStatus.Pending ||
+                    (c.Status == DeviceCommandStatus.Dispatched
+                        && c.DispatchedAt != null
+                        && c.DispatchedAt < staleDispatchBefore)))
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(cancellationToken);
     }
@@ -48,12 +52,14 @@ public class DeviceCommandRepository : IDeviceCommandRepository
     }
 
     public async Task<bool> HasActiveCommandForAppAsync(
-        Guid deviceId, string appName, CancellationToken cancellationToken = default)
+        Guid deviceId, string appName, DateTime staleDispatchBefore, CancellationToken cancellationToken = default)
     {
         return await _dbContext.DeviceCommands.AnyAsync(
             c => c.DeviceId == deviceId
                 && c.TargetAppName == appName
-                && (c.Status == DeviceCommandStatus.Pending || c.Status == DeviceCommandStatus.Dispatched),
+                && (c.Status == DeviceCommandStatus.Pending
+                    || (c.Status == DeviceCommandStatus.Dispatched
+                        && (c.DispatchedAt == null || c.DispatchedAt >= staleDispatchBefore))),
             cancellationToken);
     }
 
