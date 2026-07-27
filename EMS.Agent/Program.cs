@@ -102,6 +102,9 @@ builder.Services.AddWindowsService(options =>
 builder.Services.AddAgentServices(builder.Configuration);
 builder.Services.AddHostedService<AgentWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
+// Software-management command queue runs only in the SYSTEM service, which has
+// the rights to install/uninstall machine-wide software.
+builder.Services.AddHostedService<CommandWorker>();
 
 var host = builder.Build();
 host.Run();

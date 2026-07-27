@@ -28,6 +28,24 @@ public interface IApiClientService
     /// </summary>
     Task<bool> SendInstalledAppsAsync(
         IReadOnlyList<InstalledAppModel> applications, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Polls for pending software-management commands. Each returned command is
+    /// marked Dispatched server-side. Returns an empty list when there is
+    /// nothing to do or the agent has not registered yet.
+    /// </summary>
+    Task<IReadOnlyList<PendingCommandModel>> GetPendingCommandsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Reports the outcome of a command back to the server.</summary>
+    Task<bool> ReportCommandResultAsync(
+        Guid commandId, CommandResultModel result, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads an installer package to a temp file, verifying its SHA-256.
+    /// Returns the temp file path, or null on failure. The caller deletes it.
+    /// </summary>
+    Task<string?> DownloadPackageAsync(
+        Guid packageId, string? expectedSha256, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

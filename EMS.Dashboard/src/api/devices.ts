@@ -2,6 +2,7 @@ import type {
   AppUsageEntry,
   BlockedWebsite,
   Device,
+  DeviceCommand,
   DeviceMetrics,
   InstalledApp,
 } from '../types/device';
@@ -89,6 +90,61 @@ export async function fetchInstalledApps(id: string): Promise<InstalledApp[]> {
   }
 
   return (await response.json()) as InstalledApp[];
+}
+
+// ---- Software management ----
+
+/** Queues a silent uninstall of an inventory app. Returns immediately (202). */
+export async function uninstallApp(deviceId: string, appId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/installed-apps/${encodeURIComponent(appId)}/uninstall`,
+    { method: 'POST', headers: credentialHeaders },
+  );
+
+  if (!response.ok) {
+    if (response.status === 409 || response.status === 404) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? `The uninstall could not be queued (${response.status}).`);
+    }
+    throwForStatus(response.status);
+  }
+}
+
+/** Queues an Install (or Update) that runs an uploaded package on the device. */
+export async function queueInstall(
+  deviceId: string,
+  packageId: string,
+  type: 'install' | 'update' = 'install',
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands?type=${type}`,
+    {
+      method: 'POST',
+      headers: { ...credentialHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packageId }),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? `The command could not be queued (${response.status}).`);
+    }
+    throwForStatus(response.status);
+  }
+}
+
+/** Recent software-management commands for a device (newest first). */
+export async function fetchDeviceCommands(id: string): Promise<DeviceCommand[]> {
+  const response = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/commands`, {
+    headers: credentialHeaders,
+  });
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as DeviceCommand[];
 }
 
 export async function fetchDeviceMetrics(id: string): Promise<DeviceMetrics> {

@@ -24,6 +24,10 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<AppUser> AppUsers => Set<AppUser>();
 
+    public DbSet<InstallerPackage> InstallerPackages => Set<InstallerPackage>();
+
+    public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -169,6 +173,47 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(a => a.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InstallerPackage>(entity =>
+        {
+            entity.ToTable("installer_packages");
+
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.FileName).HasMaxLength(300).IsRequired();
+            entity.Property(p => p.DisplayName).HasMaxLength(300).IsRequired();
+            entity.Property(p => p.SilentArgs).HasMaxLength(500);
+            entity.Property(p => p.Sha256).HasMaxLength(64).IsRequired();
+
+            // Raw installer bytes; Npgsql maps byte[] to bytea by default.
+            entity.Property(p => p.Content).IsRequired();
+        });
+
+        modelBuilder.Entity<DeviceCommand>(entity =>
+        {
+            entity.ToTable("device_commands");
+
+            entity.HasKey(c => c.Id);
+
+            // Serves the agent's "pending commands for this device" poll.
+            entity.HasIndex(c => new { c.DeviceId, c.Status });
+
+            entity.Property(c => c.TargetAppName).HasMaxLength(300);
+            entity.Property(c => c.TargetAppVersion).HasMaxLength(100);
+            entity.Property(c => c.ResultMessage).HasMaxLength(2000);
+
+            entity.HasOne(c => c.Device)
+                .WithMany()
+                .HasForeignKey(c => c.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Keep a package as long as commands reference it; deleting a
+            // package is blocked while in-flight commands still point at it.
+            entity.HasOne(c => c.Package)
+                .WithMany()
+                .HasForeignKey(c => c.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AppUser>(entity =>

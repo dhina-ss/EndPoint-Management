@@ -1,4 +1,5 @@
 using EMS.API.DTOs;
+using EMS.API.Entities;
 using EMS.API.Middleware;
 using EMS.API.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -15,19 +16,22 @@ public class DevicesController : ControllerBase
     private readonly IBlockedWebsiteService _blockedWebsiteService;
     private readonly IHeartbeatService _heartbeatService;
     private readonly IApplicationInventoryService _applicationService;
+    private readonly IDeviceCommandService _commandService;
 
     public DevicesController(
         IDeviceService deviceService,
         IAppUsageService appUsageService,
         IBlockedWebsiteService blockedWebsiteService,
         IHeartbeatService heartbeatService,
-        IApplicationInventoryService applicationService)
+        IApplicationInventoryService applicationService,
+        IDeviceCommandService commandService)
     {
         _deviceService = deviceService;
         _appUsageService = appUsageService;
         _blockedWebsiteService = blockedWebsiteService;
         _heartbeatService = heartbeatService;
         _applicationService = applicationService;
+        _commandService = commandService;
     }
 
     /// <summary>
@@ -159,6 +163,108 @@ public class DevicesController : ControllerBase
     {
         var apps = await _applicationService.GetInventoryAsync(id, cancellationToken);
         return apps is null ? NotFound() : Ok(apps);
+    }
+
+    // ---- Software management (command queue) ----
+
+    /// <summary>
+    /// Queues a silent uninstall of one inventory application. Runs on the
+    /// device's next command-poll cycle; the result is reported back and shown
+    /// under GET {id}/commands.
+    /// </summary>
+    [HttpPost("{id:guid}/installed-apps/{appId:guid}/uninstall")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceCommandResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceCommandResponse>> UninstallApp(
+        Guid id, Guid appId, CancellationToken cancellationToken)
+    {
+        var result = await _commandService.EnqueueUninstallAsync(id, appId, cancellationToken);
+        return EnqueueToActionResult(result);
+    }
+
+    /// <summary>
+    /// Queues an Install or Update that delivers an uploaded installer package
+    /// to the device and runs it silently. <c>type</c> is "install" (default)
+    /// or "update".
+    /// </summary>
+    [HttpPost("{id:guid}/commands")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceCommandResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceCommandResponse>> QueueInstall(
+        Guid id,
+        [FromBody] EnqueueInstallRequest request,
+        [FromQuery] string? type,
+        CancellationToken cancellationToken)
+    {
+        var commandType = string.Equals(type, "update", StringComparison.OrdinalIgnoreCase)
+            ? DeviceCommandType.Update
+            : DeviceCommandType.Install;
+
+        var result = await _commandService.EnqueueInstallAsync(id, request.PackageId, commandType, cancellationToken);
+        return EnqueueToActionResult(result);
+    }
+
+    /// <summary>Recent software-management commands for a device, newest first.</summary>
+    [HttpGet("{id:guid}/commands")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<DeviceCommandResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<DeviceCommandResponse>>> GetCommands(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var commands = await _commandService.GetForDeviceAsync(id, cancellationToken);
+        return commands is null ? NotFound() : Ok(commands);
+    }
+
+    /// <summary>
+    /// Agent poll: pending commands for the calling device. Each returned
+    /// command is atomically marked Dispatched so a later poll won't repeat it.
+    /// </summary>
+    [HttpGet("commands/pending")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<PendingCommandDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<PendingCommandDto>>> GetPendingCommands(
+        CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var pending = await _commandService.DispatchPendingAsync(deviceId, cancellationToken);
+        return pending is null ? NotFound() : Ok(pending);
+    }
+
+    /// <summary>Agent callback: reports how a command turned out.</summary>
+    [HttpPost("commands/{commandId:guid}/result")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ReportCommandResult(
+        Guid commandId,
+        [FromBody] CommandResultRequest request,
+        CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var recorded = await _commandService.RecordResultAsync(deviceId, commandId, request, cancellationToken);
+        return recorded ? NoContent() : NotFound();
+    }
+
+    private ActionResult<DeviceCommandResponse> EnqueueToActionResult(EnqueueCommandResult result)
+    {
+        return result.Outcome switch
+        {
+            EnqueueCommandOutcome.Created => Accepted(result.Command),
+            EnqueueCommandOutcome.Duplicate => Conflict(new { message = result.Error }),
+            EnqueueCommandOutcome.DeviceNotFound => NotFound(new { message = result.Error }),
+            EnqueueCommandOutcome.AppNotFound => NotFound(new { message = result.Error }),
+            EnqueueCommandOutcome.PackageNotFound => NotFound(new { message = result.Error }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
     }
 
     /// <summary>

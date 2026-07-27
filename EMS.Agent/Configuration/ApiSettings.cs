@@ -48,4 +48,19 @@ public class ApiSettings
 
     /// <summary>How often accumulated app usage is uploaded, in minutes.</summary>
     public int AppUsageUploadIntervalMinutes { get; set; } = 5;
+
+    /// <summary>Relative path the agent polls for pending software-management commands.</summary>
+    public string PendingCommandsEndpoint { get; set; } = "/api/devices/commands/pending";
+
+    /// <summary>Relative path the agent posts a command result to (append "/{id}/result").</summary>
+    public string CommandResultEndpoint { get; set; } = "/api/devices/commands";
+
+    /// <summary>Relative path the agent downloads an installer package from (append "/{id}/content").</summary>
+    public string PackageContentEndpoint { get; set; } = "/api/packages";
+
+    /// <summary>How often the agent polls for pending commands, in seconds.</summary>
+    public int CommandPollIntervalSeconds { get; set; } = 30;
+
+    /// <summary>Hard timeout for a single install/uninstall process, in minutes.</summary>
+    public int CommandTimeoutMinutes { get; set; } = 10;
 }
