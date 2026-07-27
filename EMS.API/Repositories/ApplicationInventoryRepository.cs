@@ -23,6 +23,13 @@ public class ApplicationInventoryRepository : IApplicationInventoryRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<InstalledApplication?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.InstalledApplications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+    }
+
     public async Task ReplaceInstalledAsync(
         Guid deviceId, IEnumerable<InstalledApplication> applications, CancellationToken cancellationToken = default)
     {

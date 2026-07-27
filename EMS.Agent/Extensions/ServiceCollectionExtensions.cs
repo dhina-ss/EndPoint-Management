@@ -38,6 +38,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDeviceCollectorService, DeviceCollectorService>();
         services.AddScoped<IHeartbeatService, HeartbeatService>();
 
+        // Executes software-management commands (uninstall/install/update).
+        services.AddScoped<ICommandExecutionService, CommandExecutionService>();
+
         services.AddHttpClient<IApiClientService, ApiClientService>((serviceProvider, client) =>
         {
             var settings = serviceProvider.GetRequiredService<IOptions<ApiSettings>>().Value;

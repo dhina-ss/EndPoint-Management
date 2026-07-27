@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using EMS.Agent.Configuration;
 using EMS.Agent.Models;
 using EMS.Shared.Constants;
@@ -228,6 +229,156 @@ public class ApiClientService : IApiClientService
         {
             _logger.LogWarning("Installed-apps report timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
             return false;
+        }
+    }
+
+    public async Task<IReadOnlyList<PendingCommandModel>> GetPendingCommandsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return Array.Empty<PendingCommandModel>();
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, _settings.PendingCommandsEndpoint);
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Command poll failed with status {StatusCode}.", (int)response.StatusCode);
+                return Array.Empty<PendingCommandModel>();
+            }
+
+            var commands = await response.Content.ReadFromJsonAsync<List<PendingCommandModel>>(cancellationToken);
+            return commands ?? (IReadOnlyList<PendingCommandModel>)Array.Empty<PendingCommandModel>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Command poll could not reach the EMS server.");
+            return Array.Empty<PendingCommandModel>();
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Command poll timed out after {TimeoutSeconds}s.", _settings.TimeoutSeconds);
+            return Array.Empty<PendingCommandModel>();
+        }
+    }
+
+    public async Task<bool> ReportCommandResultAsync(
+        Guid commandId, CommandResultModel result, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return false;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+        var endpoint = $"{_settings.CommandResultEndpoint.TrimEnd('/')}/{commandId}/result";
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = JsonContent.Create(result)
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            _logger.LogWarning("Command result report failed with status {StatusCode}.", (int)response.StatusCode);
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Command result report could not reach the EMS server.");
+            return false;
+        }
+    }
+
+    public async Task<string?> DownloadPackageAsync(
+        Guid packageId, string? expectedSha256, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return null;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+        var endpoint = $"{_settings.PackageContentEndpoint.TrimEnd('/')}/{packageId}/content";
+        var tempPath = Path.Combine(Path.GetTempPath(), $"ems-pkg-{packageId:N}.tmp");
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Package download failed with status {StatusCode}.", (int)response.StatusCode);
+                return null;
+            }
+
+            await using (var httpStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var fileStream = File.Create(tempPath))
+            {
+                await httpStream.CopyToAsync(fileStream, cancellationToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(expectedSha256))
+            {
+                await using var verifyStream = File.OpenRead(tempPath);
+                var actual = Convert.ToHexString(
+                    await SHA256.HashDataAsync(verifyStream, cancellationToken)).ToLowerInvariant();
+
+                if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Package {PackageId} SHA-256 mismatch (expected {Expected}, got {Actual}).",
+                        packageId, expectedSha256, actual);
+                    TryDelete(tempPath);
+                    return null;
+                }
+            }
+
+            return tempPath;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            _logger.LogWarning(ex, "Package download failed for {PackageId}.", packageId);
+            TryDelete(tempPath);
+            return null;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Temp file; ignored.
         }
     }
 

@@ -34,28 +34,56 @@ import BatteryStdIcon from '@mui/icons-material/BatteryStd';
 import InventoryIcon from '@mui/icons-material/Inventory2';
 import SearchIcon from '@mui/icons-material/Search';
 import InputAdornment from '@mui/material/InputAdornment';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import Tooltip from '@mui/material/Tooltip';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import InstallDesktopIcon from '@mui/icons-material/InstallDesktop';
+import HistoryIcon from '@mui/icons-material/History';
 import {
   addBlockedWebsite,
   fetchAppUsage,
   fetchBlockedWebsites,
   fetchDevice,
+  fetchDeviceCommands,
   fetchDeviceMetrics,
   fetchInstalledApps,
+  queueInstall,
   removeBlockedWebsite,
   setStoreGating,
   setUsbBlocking,
+  uninstallApp,
 } from '../api/devices';
+import { deletePackage, fetchPackages, uploadPackage } from '../api/packages';
 import {
+  formatBytes,
   formatDuration,
   formatRate,
   formatUptime,
+  isCommandActive,
   isOnline,
   type AppUsageEntry,
   type BlockedWebsite,
   type Device,
+  type DeviceCommand,
   type DeviceMetrics,
   type InstalledApp,
+  type InstallerPackage,
 } from '../types/device';
+
+const COMMAND_STATUS_COLOR: Record<
+  DeviceCommand['status'],
+  'default' | 'info' | 'success' | 'error'
+> = {
+  Pending: 'default',
+  Dispatched: 'info',
+  Succeeded: 'success',
+  Failed: 'error',
+};
 
 function formatDate(iso: string | null): string {
   if (!iso) {
@@ -165,6 +193,25 @@ export default function DeviceDetailsPage() {
   const [blockPending, setBlockPending] = useState(false);
   const [blockError, setBlockError] = useState<string | null>(null);
 
+  // Software management
+  const [commands, setCommands] = useState<DeviceCommand[]>([]);
+  const [packages, setPackages] = useState<InstallerPackage[]>([]);
+  const [softwareError, setSoftwareError] = useState<string | null>(null);
+  const [confirmUninstall, setConfirmUninstall] = useState<InstalledApp | null>(null);
+  const [uninstallPending, setUninstallPending] = useState(false);
+  const [installPackageId, setInstallPackageId] = useState('');
+  const [installPending, setInstallPending] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState('');
+  const [uploadArgs, setUploadArgs] = useState('');
+  const [uploadPending, setUploadPending] = useState(false);
+
+  // Set of app names that currently have a queued/running command, so the
+  // inventory list can show an "in progress" chip and disable re-triggering.
+  const activeCommandApps = new Set(
+    commands.filter((c) => isCommandActive(c.status) && c.targetAppName).map((c) => c.targetAppName as string),
+  );
+
   const loadDevice = useCallback(async () => {
     if (!id) {
       return;
@@ -231,13 +278,56 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadCommands = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setCommands(await fetchDeviceCommands(id));
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to load command history.');
+    }
+  }, [id]);
+
+  const loadPackages = useCallback(async () => {
+    try {
+      setPackages(await fetchPackages());
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to load installer packages.');
+    }
+  }, []);
+
   useEffect(() => {
     void loadDevice();
     void loadAppUsage();
     void loadBlockedSites();
     void loadMetrics();
     void loadInstalledApps();
-  }, [loadDevice, loadAppUsage, loadBlockedSites, loadMetrics, loadInstalledApps]);
+    void loadCommands();
+    void loadPackages();
+  }, [
+    loadDevice,
+    loadAppUsage,
+    loadBlockedSites,
+    loadMetrics,
+    loadInstalledApps,
+    loadCommands,
+    loadPackages,
+  ]);
+
+  // Commands change state on the device asynchronously (queued -> dispatched ->
+  // done), so poll while any command is still in flight to reflect progress.
+  useEffect(() => {
+    const hasActive = commands.some((c) => isCommandActive(c.status));
+    if (!hasActive) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void loadCommands();
+      void loadInstalledApps();
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [commands, loadCommands, loadInstalledApps]);
 
   // Live monitoring polls on its own so the panel stays current without the
   // user pressing Refresh. The agent reports every 60s; polling at 30s keeps
@@ -274,6 +364,72 @@ export default function DeviceDetailsPage() {
       setBlockedSites((prev) => prev.filter((b) => b.id !== blockId));
     } catch (err) {
       setBlockError(err instanceof Error ? err.message : 'Failed to remove the domain.');
+    }
+  };
+
+  const handleConfirmUninstall = async () => {
+    if (!id || !confirmUninstall) {
+      return;
+    }
+    setUninstallPending(true);
+    setSoftwareError(null);
+    try {
+      await uninstallApp(id, confirmUninstall.id);
+      setConfirmUninstall(null);
+      await loadCommands();
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to queue the uninstall.');
+    } finally {
+      setUninstallPending(false);
+    }
+  };
+
+  const handleInstall = async () => {
+    if (!id || !installPackageId) {
+      return;
+    }
+    setInstallPending(true);
+    setSoftwareError(null);
+    try {
+      await queueInstall(id, installPackageId, 'install');
+      setInstallPackageId('');
+      await loadCommands();
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to queue the install.');
+    } finally {
+      setInstallPending(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      return;
+    }
+    setUploadPending(true);
+    setSoftwareError(null);
+    try {
+      await uploadPackage(uploadFile, uploadName, uploadArgs);
+      setUploadFile(null);
+      setUploadName('');
+      setUploadArgs('');
+      await loadPackages();
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to upload the installer.');
+    } finally {
+      setUploadPending(false);
+    }
+  };
+
+  const handleDeletePackage = async (packageId: string) => {
+    setSoftwareError(null);
+    try {
+      await deletePackage(packageId);
+      setPackages((prev) => prev.filter((p) => p.id !== packageId));
+      if (installPackageId === packageId) {
+        setInstallPackageId('');
+      }
+    } catch (err) {
+      setSoftwareError(err instanceof Error ? err.message : 'Failed to delete the package.');
     }
   };
 
@@ -755,24 +911,49 @@ export default function DeviceDetailsPage() {
                       .filter((v): v is string => v !== null)
                       .some((v) => v.toLowerCase().includes(term));
                   })
-                  .map((app) => (
-                    <Box
-                      key={`${app.id}-${app.executableName ?? app.name}`}
-                      sx={{ py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
-                    >
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="body2" noWrap>
-                          {app.name}
-                        </Typography>
-                        {app.isStoreApp && <Chip label="Store" size="small" variant="outlined" />}
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary">
-                        {[app.publisher, app.version, app.executableName]
-                          .filter(Boolean)
-                          .join(' · ') || '—'}
-                      </Typography>
-                    </Box>
-                  ))}
+                  .map((app) => {
+                    const inProgress = activeCommandApps.has(app.name);
+                    return (
+                      <Box
+                        key={`${app.id}-${app.executableName ?? app.name}`}
+                        sx={{ py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <Typography variant="body2" noWrap>
+                                {app.name}
+                              </Typography>
+                              {app.isStoreApp && (
+                                <Chip label="Store" size="small" variant="outlined" />
+                              )}
+                              {inProgress && (
+                                <Chip label="Action in progress" size="small" color="info" />
+                              )}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {[app.publisher, app.version, app.executableName]
+                                .filter(Boolean)
+                                .join(' · ') || '—'}
+                            </Typography>
+                          </Box>
+                          <Tooltip title={inProgress ? 'A command is already in progress' : 'Uninstall'}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                disabled={inProgress}
+                                onClick={() => setConfirmUninstall(app)}
+                                aria-label={`Uninstall ${app.name}`}
+                              >
+                                <DeleteSweepIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
               </Box>
             )}
           </CardContent>
@@ -826,6 +1007,192 @@ export default function DeviceDetailsPage() {
           </CardContent>
         </Card>
       )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <InstallDesktopIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Software Management
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1.5 }} />
+
+            {softwareError && (
+              <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setSoftwareError(null)}>
+                {softwareError}
+              </Alert>
+            )}
+
+            {/* Upload an installer to the shared library (Push MSI/EXE). */}
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+              Upload installer (MSI / EXE)
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }} sx={{ mb: 1 }}>
+              <Button component="label" variant="outlined" size="small" startIcon={<CloudUploadIcon />}>
+                {uploadFile ? uploadFile.name : 'Choose file'}
+                <input
+                  hidden
+                  type="file"
+                  accept=".msi,.exe"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setUploadFile(file);
+                    if (file && !uploadName) {
+                      setUploadName(file.name.replace(/\.(msi|exe)$/i, ''));
+                    }
+                  }}
+                />
+              </Button>
+              <TextField
+                size="small"
+                label="Display name"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+              />
+              <TextField
+                size="small"
+                label="Silent args (EXE)"
+                placeholder="/S"
+                value={uploadArgs}
+                onChange={(e) => setUploadArgs(e.target.value)}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                disabled={!uploadFile || uploadPending}
+                onClick={() => void handleUpload()}
+              >
+                {uploadPending ? 'Uploading…' : 'Upload'}
+              </Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              MSI installs silently automatically. For EXE, provide the vendor's silent switch (e.g. <code>/S</code>),
+              or it may fail to install unattended.
+            </Typography>
+
+            <Divider sx={{ my: 1.5 }} />
+
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+              Package library
+            </Typography>
+            {packages.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                No installer packages uploaded yet.
+              </Typography>
+            ) : (
+              <Stack spacing={0.5}>
+                {packages.map((pkg) => (
+                  <Stack
+                    key={pkg.id}
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{ py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}
+                  >
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" noWrap>
+                          {pkg.displayName}
+                        </Typography>
+                        <Chip label={pkg.kind} size="small" variant="outlined" />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">
+                        {pkg.fileName} · {formatBytes(pkg.sizeBytes)}
+                        {pkg.silentArgs ? ` · ${pkg.silentArgs}` : ''}
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={installPending}
+                      onClick={() => {
+                        setInstallPackageId(pkg.id);
+                        void handleInstall();
+                      }}
+                    >
+                      Install
+                    </Button>
+                    <Tooltip title="Delete package">
+                      <IconButton
+                        size="small"
+                        aria-label={`Delete ${pkg.displayName}`}
+                        onClick={() => void handleDeletePackage(pkg.id)}
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <HistoryIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Recent Commands
+              </Typography>
+              {commands.some((c) => isCommandActive(c.status)) && (
+                <Chip label="Active" size="small" color="info" />
+              )}
+            </Stack>
+            <Divider sx={{ mb: 1 }} />
+
+            {commands.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                No software-management commands have been issued for this device.
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                {commands.map((cmd) => (
+                  <Box
+                    key={cmd.id}
+                    sx={{ py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Chip label={cmd.type} size="small" variant="outlined" />
+                      <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                        {cmd.targetAppName ?? cmd.packageName ?? '—'}
+                      </Typography>
+                      <Chip label={cmd.status} size="small" color={COMMAND_STATUS_COLOR[cmd.status]} />
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDate(cmd.createdAt)}
+                      {cmd.resultMessage ? ` · ${cmd.resultMessage}` : ''}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={confirmUninstall !== null} onClose={() => setConfirmUninstall(null)}>
+        <DialogTitle>Uninstall application?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will silently uninstall <strong>{confirmUninstall?.name}</strong> from this device on
+            its next command cycle. Apps without a silent uninstaller will report a failure instead of
+            removing. This cannot be undone from here.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmUninstall(null)} disabled={uninstallPending}>
+            Cancel
+          </Button>
+          <Button color="error" variant="contained" onClick={() => void handleConfirmUninstall()} disabled={uninstallPending}>
+            {uninstallPending ? 'Queuing…' : 'Uninstall'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

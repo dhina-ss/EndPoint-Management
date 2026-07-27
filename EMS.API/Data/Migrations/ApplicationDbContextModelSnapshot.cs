@@ -245,6 +245,60 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("device_authentications", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.DeviceCommand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ResultCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResultMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetAppName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("TargetAppVersion")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("TargetIsStoreApp")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageId");
+
+                    b.HasIndex("DeviceId", "Status");
+
+                    b.ToTable("device_commands", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.DeviceHeartbeat", b =>
                 {
                     b.Property<Guid>("Id")
@@ -354,6 +408,49 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("installed_applications", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.InstallerPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SilentArgs")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("installer_packages", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
@@ -385,6 +482,24 @@ namespace EMS.API.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.DeviceCommand", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EMS.API.Entities.InstallerPackage", "Package")
+                        .WithMany()
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Device");
+
+                    b.Navigation("Package");
                 });
 
             modelBuilder.Entity("EMS.API.Entities.DeviceHeartbeat", b =>

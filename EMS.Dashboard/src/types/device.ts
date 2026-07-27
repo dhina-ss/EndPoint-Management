@@ -60,6 +60,52 @@ export interface InstalledApp {
   isStoreApp: boolean;
 }
 
+/** Mirrors EMS.API InstallerPackageResponse. */
+export interface InstallerPackage {
+  id: string;
+  fileName: string;
+  displayName: string;
+  kind: 'Msi' | 'Exe';
+  silentArgs: string | null;
+  sizeBytes: number;
+  sha256: string;
+  uploadedAt: string;
+}
+
+export type CommandType = 'Uninstall' | 'Install' | 'Update';
+export type CommandStatus = 'Pending' | 'Dispatched' | 'Succeeded' | 'Failed';
+
+/** Mirrors EMS.API DeviceCommandResponse. */
+export interface DeviceCommand {
+  id: string;
+  type: CommandType;
+  status: CommandStatus;
+  targetAppName: string | null;
+  targetAppVersion: string | null;
+  packageName: string | null;
+  resultMessage: string | null;
+  resultCode: number | null;
+  createdAt: string;
+  dispatchedAt: string | null;
+  completedAt: string | null;
+}
+
+/** True while a command is still queued or running on the device. */
+export function isCommandActive(status: CommandStatus): boolean {
+  return status === 'Pending' || status === 'Dispatched';
+}
+
+/** "12.3 MB" style size from a byte count. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** Mirrors EMS.API DeviceMetricsResponse. Every metric may be null. */
 export interface DeviceMetrics {
   collectedAt: string | null;
