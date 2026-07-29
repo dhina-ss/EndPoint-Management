@@ -8,7 +8,7 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Dhinakaran Sekar"
 #define MyAppExeName "EMS.Agent.exe"
 #define MyServiceName "EMSAgent"

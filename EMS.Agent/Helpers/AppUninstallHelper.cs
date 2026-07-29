@@ -22,6 +22,14 @@ public static class AppUninstallHelper
         @"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}",
         RegexOptions.Compiled);
 
+    // A real MSI's uninstall key IS its product code: the whole key name is a
+    // GUID. Inno Setup keys look like "{GUID}_is1", InstallShield "{GUID}", etc.,
+    // so anchor the match to avoid treating an Inno key's embedded GUID as an
+    // MSI product code (which yields msiexec error 1605 - unknown product).
+    private static readonly Regex ExactProductCodeKey = new(
+        @"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$",
+        RegexOptions.Compiled);
+
     /// <summary>One app's uninstall-relevant registry values.</summary>
     public sealed record UninstallEntry(
         string DisplayName, string? DisplayVersion, string KeyName,
@@ -86,8 +94,7 @@ public static class AppUninstallHelper
     public static (UninstallPlan? plan, string? failureReason) PlanUninstall(UninstallEntry entry)
     {
         // Prefer an MSI product code: msiexec is reliably silent with /qn.
-        var productCode = ExtractMsiProductCode(entry.KeyName)
-            ?? ExtractMsiProductCode(entry.UninstallString);
+        var productCode = ResolveMsiProductCode(entry);
 
         if (productCode is not null)
         {
@@ -140,7 +147,29 @@ public static class AppUninstallHelper
         return "/S";
     }
 
-    /// <summary>Pulls a {GUID} product code out of a key name or msiexec command.</summary>
+    /// <summary>
+    /// The MSI product code for an app, but only when we are confident it is
+    /// MSI-based: the uninstall key is exactly a product-code GUID, or the
+    /// UninstallString actually invokes msiexec. An Inno Setup key ("{GUID}_is1")
+    /// or any other embedded GUID is deliberately ignored.
+    /// </summary>
+    public static string? ResolveMsiProductCode(UninstallEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.KeyName) && ExactProductCodeKey.IsMatch(entry.KeyName.Trim()))
+        {
+            return entry.KeyName.Trim().ToUpperInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.UninstallString)
+            && entry.UninstallString.Contains("msiexec", StringComparison.OrdinalIgnoreCase))
+        {
+            return ExtractMsiProductCode(entry.UninstallString);
+        }
+
+        return null;
+    }
+
+    /// <summary>Pulls the first {GUID} product code out of a string, or null.</summary>
     public static string? ExtractMsiProductCode(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
