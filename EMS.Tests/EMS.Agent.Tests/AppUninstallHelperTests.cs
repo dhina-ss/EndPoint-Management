@@ -81,6 +81,26 @@ public class AppUninstallHelperTests
     }
 
     [Fact]
+    public void PlanUninstall_InnoKeyWithEmbeddedGuid_DoesNotUseMsiexec()
+    {
+        // VS Code (User) is Inno Setup: its key is "{GUID}_is1". The embedded
+        // GUID must NOT be treated as an MSI product code (that caused msiexec
+        // error 1605); it should run unins000.exe /VERYSILENT instead.
+        var entry = new AppUninstallHelper.UninstallEntry(
+            "Microsoft Visual Studio Code (User)", "1.130.0",
+            "{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1",
+            "\"C:\\Users\\jc\\AppData\\Local\\Programs\\Microsoft VS Code\\unins000.exe\"", null);
+
+        var (plan, reason) = AppUninstallHelper.PlanUninstall(entry);
+
+        Assert.Null(reason);
+        Assert.NotNull(plan);
+        Assert.EndsWith("unins000.exe", plan!.FileName);
+        Assert.Contains("/VERYSILENT", plan.Arguments);
+        Assert.DoesNotContain("msiexec", plan.FileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PlanUninstall_InnoSetupUninstaller_UsesVerySilent()
     {
         var entry = new AppUninstallHelper.UninstallEntry(
