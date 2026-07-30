@@ -106,6 +106,13 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Mirrors EMS.API NetworkUsageResponse — one day's data usage. */
+export interface NetworkUsageEntry {
+  usageDate: string;
+  bytesSent: number;
+  bytesReceived: number;
+}
+
 /** Mirrors EMS.API DeviceMetricsResponse. Every metric may be null. */
 export interface DeviceMetrics {
   collectedAt: string | null;

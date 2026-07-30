@@ -44,6 +44,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InstallDesktopIcon from '@mui/icons-material/InstallDesktop';
 import HistoryIcon from '@mui/icons-material/History';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 import {
   addBlockedWebsite,
   fetchAppUsage,
@@ -52,6 +53,7 @@ import {
   fetchDeviceCommands,
   fetchDeviceMetrics,
   fetchInstalledApps,
+  fetchNetworkUsage,
   queueInstall,
   removeBlockedWebsite,
   setStoreGating,
@@ -73,6 +75,7 @@ import {
   type DeviceMetrics,
   type InstalledApp,
   type InstallerPackage,
+  type NetworkUsageEntry,
 } from '../types/device';
 
 const COMMAND_STATUS_COLOR: Record<
@@ -184,6 +187,8 @@ export default function DeviceDetailsPage() {
   const [metrics, setMetrics] = useState<DeviceMetrics | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
 
+  const [networkUsage, setNetworkUsage] = useState<NetworkUsageEntry[]>([]);
+
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
   const [appSearch, setAppSearch] = useState('');
   const [appsError, setAppsError] = useState<string | null>(null);
@@ -267,6 +272,17 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadNetworkUsage = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setNetworkUsage(await fetchNetworkUsage(id, 7));
+    } catch {
+      // Non-critical panel; leave it empty on error.
+    }
+  }, [id]);
+
   const loadInstalledApps = useCallback(async () => {
     if (!id) {
       return;
@@ -305,6 +321,7 @@ export default function DeviceDetailsPage() {
     void loadInstalledApps();
     void loadCommands();
     void loadPackages();
+    void loadNetworkUsage();
   }, [
     loadDevice,
     loadAppUsage,
@@ -313,6 +330,7 @@ export default function DeviceDetailsPage() {
     loadInstalledApps,
     loadCommands,
     loadPackages,
+    loadNetworkUsage,
   ]);
 
   // Commands change state on the device asynchronously (queued -> dispatched ->
@@ -333,9 +351,12 @@ export default function DeviceDetailsPage() {
   // user pressing Refresh. The agent reports every 60s; polling at 30s keeps
   // the display at most one interval behind.
   useEffect(() => {
-    const timer = window.setInterval(() => void loadMetrics(), 30_000);
+    const timer = window.setInterval(() => {
+      void loadMetrics();
+      void loadNetworkUsage();
+    }, 30_000);
     return () => window.clearInterval(timer);
-  }, [loadMetrics]);
+  }, [loadMetrics, loadNetworkUsage]);
 
   const handleAddBlockedSite = async () => {
     if (!id || !newDomain.trim()) {
@@ -955,6 +976,89 @@ export default function DeviceDetailsPage() {
                     );
                   })}
               </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <DataUsageIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Network Usage
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                last 7 days
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1.5 }} />
+
+            {networkUsage.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                No network usage recorded yet. It accumulates from the device's heartbeats.
+              </Typography>
+            ) : (
+              (() => {
+                const todayIso = new Date().toISOString().slice(0, 10);
+                const today = networkUsage.find((u) => u.usageDate.slice(0, 10) === todayIso);
+                const total7 = networkUsage.reduce((s, u) => s + u.bytesSent + u.bytesReceived, 0);
+                const maxDay = Math.max(
+                  ...networkUsage.map((u) => u.bytesSent + u.bytesReceived),
+                  1,
+                );
+                return (
+                  <>
+                    <Stack direction="row" spacing={3} sx={{ mb: 1.5 }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Today ↓ received
+                        </Typography>
+                        <Typography variant="h6">{formatBytes(today?.bytesReceived ?? 0)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Today ↑ sent
+                        </Typography>
+                        <Typography variant="h6">{formatBytes(today?.bytesSent ?? 0)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          7-day total
+                        </Typography>
+                        <Typography variant="h6">{formatBytes(total7)}</Typography>
+                      </Box>
+                    </Stack>
+                    <Stack spacing={1}>
+                      {networkUsage.map((u) => {
+                        const dayTotal = u.bytesSent + u.bytesReceived;
+                        return (
+                          <Box key={u.usageDate}>
+                            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                              <Typography variant="body2">
+                                {new Date(u.usageDate).toLocaleDateString(undefined, {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                ↓ {formatBytes(u.bytesReceived)} · ↑ {formatBytes(u.bytesSent)}
+                              </Typography>
+                            </Stack>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.round((dayTotal / maxDay) * 100)}
+                              sx={{ height: 6, borderRadius: 3 }}
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </>
+                );
+              })()
             )}
           </CardContent>
         </Card>

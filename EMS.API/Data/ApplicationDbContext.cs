@@ -28,6 +28,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
 
+    public DbSet<NetworkUsageRecord> NetworkUsageRecords => Set<NetworkUsageRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -172,6 +174,21 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(a => a.Device)
                 .WithMany()
                 .HasForeignKey(a => a.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NetworkUsageRecord>(entity =>
+        {
+            entity.ToTable("network_usage_records");
+
+            entity.HasKey(n => n.Id);
+
+            // One row per device/day; the service upserts into this.
+            entity.HasIndex(n => new { n.DeviceId, n.UsageDate }).IsUnique();
+
+            entity.HasOne(n => n.Device)
+                .WithMany()
+                .HasForeignKey(n => n.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

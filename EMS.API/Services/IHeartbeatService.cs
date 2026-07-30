@@ -19,4 +19,11 @@ public interface IHeartbeatService
     /// </summary>
     Task<DeviceMetricsResponse?> GetLatestMetricsAsync(
         Guid deviceInternalId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Daily network data-usage totals for a device over the last
+    /// <paramref name="days"/> days (UTC). Null when the device does not exist.
+    /// </summary>
+    Task<IReadOnlyList<NetworkUsageResponse>?> GetNetworkUsageAsync(
+        Guid deviceInternalId, int days, CancellationToken cancellationToken = default);
 }

@@ -284,6 +284,22 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
+    /// Daily network data-usage totals (bytes sent/received) for a device over
+    /// the last <c>days</c> days (default 7, UTC).
+    /// </summary>
+    [HttpGet("{id:guid}/network-usage")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<NetworkUsageResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<NetworkUsageResponse>>> GetNetworkUsage(
+        Guid id, [FromQuery] int? days, CancellationToken cancellationToken)
+    {
+        var usage = await _heartbeatService.GetNetworkUsageAsync(id, days ?? 7, cancellationToken);
+        return usage is null ? NotFound() : Ok(usage);
+    }
+
+    /// <summary>
     /// Lists the device-specific blocked domains (in addition to the agent's
     /// always-on default phishing/malware list).
     /// </summary>
