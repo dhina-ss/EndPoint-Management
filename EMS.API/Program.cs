@@ -112,8 +112,9 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-// Verify database connectivity before serving traffic: a clear startup
-// failure beats a stream of 500s. Uses the configured retry policy.
+// Verify database connectivity and bring the schema up to date before serving
+// traffic: a clear startup failure beats a stream of 500s. Uses the configured
+// retry policy.
 using (var startupScope = app.Services.CreateScope())
 {
     var dbContext = startupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -131,18 +132,26 @@ using (var startupScope = app.Services.CreateScope())
             "Database connection verified: {Database} on {Host}.",
             dbConnection.Database, dbConnection.DataSource);
 
+        // Apply any pending migrations automatically so a deploy is always in
+        // sync with the code - the app and DB can never drift (which otherwise
+        // shows up as "column ... does not exist" 500s). EF takes a migration
+        // lock, so concurrent instances won't race.
         var pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
         if (pendingMigrations.Count > 0)
         {
-            startupLogger.LogWarning(
-                "The database is missing {Count} migration(s): {Migrations}. Run 'dotnet ef database update --project EMS.API'.",
+            startupLogger.LogInformation(
+                "Applying {Count} pending migration(s): {Migrations}.",
                 pendingMigrations.Count, string.Join(", ", pendingMigrations));
+
+            await dbContext.Database.MigrateAsync();
+
+            startupLogger.LogInformation("Database migrations applied successfully.");
         }
     }
     catch (Exception ex)
     {
         startupLogger.LogCritical(ex,
-            "Cannot connect to database {Database} on {Host}. " +
+            "Cannot connect to or migrate database {Database} on {Host}. " +
             "Check ConnectionStrings:DefaultConnection (for Neon it must include 'SSL Mode=Require'). The API will not start.",
             dbConnection.Database, dbConnection.DataSource);
         return 1;
