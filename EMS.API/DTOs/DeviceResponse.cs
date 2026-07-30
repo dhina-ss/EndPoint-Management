@@ -57,4 +57,7 @@ public class DeviceResponse
     public string? ActivatedByEmail { get; set; }
 
     public DateTime? ActivatedAt { get; set; }
+
+    /// <summary>"Online", "Sleep", or "Offline".</summary>
+    public string Status { get; set; } = "Offline";
 }

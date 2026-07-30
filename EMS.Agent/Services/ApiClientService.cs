@@ -187,6 +187,78 @@ public class ApiClientService : IApiClientService
         }
     }
 
+    public async Task<bool> SendWorkTimeAsync(
+        IReadOnlyList<WorkTimeModel> sessions, CancellationToken cancellationToken = default)
+    {
+        if (sessions.Count == 0)
+        {
+            return true;
+        }
+
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            _logger.LogDebug("Work-time upload skipped: agent has not registered yet.");
+            return false;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.WorkTimeEndpoint)
+            {
+                Content = JsonContent.Create(new WorkTimeReportPayload { Sessions = sessions.ToList() })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            _logger.LogWarning("Work-time upload failed with status {StatusCode}.", (int)response.StatusCode);
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Work-time upload could not reach the EMS server.");
+            return false;
+        }
+    }
+
+    public async Task SendPowerStateAsync(bool suspended, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.PowerStateEndpoint)
+            {
+                Content = JsonContent.Create(new { suspended })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            _logger.LogDebug("Power-state beacon sent (suspended={Suspended}): {Status}.",
+                suspended, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort: the machine may suspend mid-request.
+            _logger.LogDebug(ex, "Power-state beacon could not be delivered.");
+        }
+    }
+
     public async Task<bool> SendInstalledAppsAsync(
         IReadOnlyList<InstalledAppModel> applications, CancellationToken cancellationToken = default)
     {

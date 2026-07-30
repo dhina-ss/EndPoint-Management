@@ -31,6 +31,12 @@ public static class ServiceCollectionExtensions
         // until the worker flushes and uploads it.
         services.AddSingleton<IAppUsageTrackerService, AppUsageTrackerService>();
 
+        // Session lock/suspend listener and the work-time accumulator. Both are
+        // singletons (state must survive across ticks); constructed only in the
+        // per-user tracker process that resolves the AppUsageWorker.
+        services.AddSingleton<ISessionStateService, SessionStateService>();
+        services.AddSingleton<IWorkTimeTracker, WorkTimeTracker>();
+
         // Singleton: network throughput is a rate, so the previous sample's
         // byte counters must survive between heartbeats.
         services.AddSingleton<ISystemMetricsService, SystemMetricsService>();

@@ -175,8 +175,10 @@ public class DeviceService : IDeviceService
 
     private static DeviceResponse MapToResponse(Device device)
     {
+        var utcNow = DateTime.UtcNow;
         return new DeviceResponse
         {
+            Status = DeviceStatusCalculator.Compute(device.LastHeartbeatTime, device.SuspendedAt, utcNow),
             Id = device.Id,
             DeviceId = device.DeviceId,
             DeviceName = device.DeviceName,

@@ -17,6 +17,7 @@ public class DevicesController : ControllerBase
     private readonly IHeartbeatService _heartbeatService;
     private readonly IApplicationInventoryService _applicationService;
     private readonly IDeviceCommandService _commandService;
+    private readonly IWorkSessionService _workSessionService;
 
     public DevicesController(
         IDeviceService deviceService,
@@ -24,7 +25,8 @@ public class DevicesController : ControllerBase
         IBlockedWebsiteService blockedWebsiteService,
         IHeartbeatService heartbeatService,
         IApplicationInventoryService applicationService,
-        IDeviceCommandService commandService)
+        IDeviceCommandService commandService,
+        IWorkSessionService workSessionService)
     {
         _deviceService = deviceService;
         _appUsageService = appUsageService;
@@ -32,6 +34,7 @@ public class DevicesController : ControllerBase
         _heartbeatService = heartbeatService;
         _applicationService = applicationService;
         _commandService = commandService;
+        _workSessionService = workSessionService;
     }
 
     /// <summary>
@@ -281,6 +284,53 @@ public class DevicesController : ControllerBase
     {
         var metrics = await _heartbeatService.GetLatestMetricsAsync(id, cancellationToken);
         return metrics is null ? NotFound() : Ok(metrics);
+    }
+
+    /// <summary>
+    /// Receives a batch of per-day working-time deltas from an agent and adds
+    /// them to each day's running total.
+    /// </summary>
+    [HttpPost("work-time")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ReportWorkTime(
+        [FromBody] WorkTimeReportRequest request, CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var stored = await _workSessionService.RecordAsync(deviceId, request, cancellationToken);
+        return stored ? NoContent() : NotFound();
+    }
+
+    /// <summary>Daily working-hours totals for a device over the last <c>days</c> days.</summary>
+    [HttpGet("{id:guid}/work-time")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<WorkTimeResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<WorkTimeResponse>>> GetWorkTime(
+        Guid id, [FromQuery] int? days, CancellationToken cancellationToken)
+    {
+        var usage = await _workSessionService.GetForDeviceAsync(id, days ?? 7, cancellationToken);
+        return usage is null ? NotFound() : Ok(usage);
+    }
+
+    /// <summary>
+    /// Agent beacon that the device is entering (or leaving) sleep; drives the
+    /// device's Sleep status until the next heartbeat.
+    /// </summary>
+    [HttpPost("power-state")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SetPowerState(
+        [FromBody] PowerStateRequest request, CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var ok = await _workSessionService.SetPowerStateAsync(deviceId, request.Suspended, cancellationToken);
+        return ok ? NoContent() : NotFound();
     }
 
     /// <summary>

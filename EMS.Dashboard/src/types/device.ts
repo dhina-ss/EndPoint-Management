@@ -1,3 +1,17 @@
+/** Server-computed device status. */
+export type DeviceStatus = 'Online' | 'Sleep' | 'Offline';
+
+/** MUI Chip color for a device status. */
+export function statusColor(status: DeviceStatus): 'success' | 'warning' | 'default' {
+  if (status === 'Online') {
+    return 'success';
+  }
+  if (status === 'Sleep') {
+    return 'warning';
+  }
+  return 'default';
+}
+
 /** Mirrors EMS.API DeviceResponse (camelCase over the wire). */
 export interface Device {
   id: string;
@@ -21,6 +35,7 @@ export interface Device {
   lastHeartbeatTime: string | null;
   usbBlockingEnabled: boolean;
   storeGatingEnabled: boolean;
+  status: DeviceStatus;
   activatedByUserId: string | null;
   activatedByEmployeeCode: string | null;
   activatedByName: string | null;
@@ -118,10 +133,27 @@ export interface NetworkUsageEntry {
   bytesReceived: number;
 }
 
+/** Mirrors EMS.API WorkTimeResponse — one day's working seconds. */
+export interface WorkTimeEntry {
+  workDate: string;
+  workedSeconds: number;
+}
+
+/** "7h 42m" from seconds; "0m" when empty. */
+export function formatHoursMinutes(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
 /** Mirrors EMS.API DeviceMetricsResponse. Every metric may be null. */
 export interface DeviceMetrics {
   collectedAt: string | null;
   isOnline: boolean;
+  status: DeviceStatus;
   cpuUsagePercent: number | null;
   memoryUsagePercent: number | null;
   memoryUsedMb: number | null;

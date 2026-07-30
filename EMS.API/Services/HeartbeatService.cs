@@ -47,6 +47,9 @@ public class HeartbeatService : IHeartbeatService
         device.LastHeartbeatTime = utcNow;
         device.LastSeen = utcNow;
 
+        // A heartbeat means the device is awake again; clear any sleep marker.
+        device.SuspendedAt = null;
+
         var heartbeat = new DeviceHeartbeat
         {
             Id = Guid.NewGuid(),
@@ -80,13 +83,6 @@ public class HeartbeatService : IHeartbeatService
         };
     }
 
-    /// <summary>
-    /// A device counts as online when its last heartbeat is within three
-    /// intervals (3 x 60s), i.e. three missed beats. Kept server-side so the
-    /// dashboard, alerts and reports can never disagree on the rule.
-    /// </summary>
-    private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(3);
-
     public async Task<DeviceMetricsResponse?> GetLatestMetricsAsync(
         Guid deviceInternalId, CancellationToken cancellationToken = default)
     {
@@ -96,19 +92,21 @@ public class HeartbeatService : IHeartbeatService
             return null;
         }
 
-        var isOnline = device.LastHeartbeatTime is not null
-            && DateTime.UtcNow - device.LastHeartbeatTime.Value < OnlineThreshold;
+        var utcNow = DateTime.UtcNow;
+        var isOnline = DeviceStatusCalculator.IsOnline(device.LastHeartbeatTime, utcNow);
+        var status = DeviceStatusCalculator.Compute(device.LastHeartbeatTime, device.SuspendedAt, utcNow);
 
         var latest = await _heartbeatRepository.GetLatestForDeviceAsync(deviceInternalId, cancellationToken);
         if (latest is null)
         {
-            return new DeviceMetricsResponse { IsOnline = isOnline };
+            return new DeviceMetricsResponse { IsOnline = isOnline, Status = status };
         }
 
         return new DeviceMetricsResponse
         {
             CollectedAt = latest.HeartbeatTime,
             IsOnline = isOnline,
+            Status = status,
             CpuUsagePercent = latest.CpuUsagePercent,
             MemoryUsagePercent = latest.MemoryUsagePercent,
             MemoryUsedMb = latest.MemoryUsedMb,

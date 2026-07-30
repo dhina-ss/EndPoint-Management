@@ -62,6 +62,7 @@ builder.Services.AddScoped<IApplicationInventoryRepository, ApplicationInventory
 builder.Services.AddScoped<IInstallerPackageRepository, InstallerPackageRepository>();
 builder.Services.AddScoped<IDeviceCommandRepository, DeviceCommandRepository>();
 builder.Services.AddScoped<INetworkUsageRepository, NetworkUsageRepository>();
+builder.Services.AddScoped<IWorkSessionRepository, WorkSessionRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
@@ -70,6 +71,7 @@ builder.Services.AddScoped<IBlockedWebsiteService, BlockedWebsiteService>();
 builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventoryService>();
 builder.Services.AddScoped<IInstallerPackageService, InstallerPackageService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
+builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 

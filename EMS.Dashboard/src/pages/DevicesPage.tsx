@@ -21,7 +21,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { fetchDevices } from '../api/devices';
-import { isOnline, type Device } from '../types/device';
+import { isOnline, statusColor, type Device } from '../types/device';
 
 function formatLastSeen(iso: string | null): string {
   if (!iso) {
@@ -183,7 +183,6 @@ export default function DevicesPage() {
               </TableRow>
             ) : (
               filteredDevices.map((device) => {
-                const online = isOnline(device);
                 return (
                   <TableRow
                     key={device.id}
@@ -219,10 +218,10 @@ export default function DevicesPage() {
                     <TableCell>{formatLastSeen(device.lastSeen)}</TableCell>
                     <TableCell>
                       <Chip
-                        label={online ? 'Online' : 'Offline'}
-                        color={online ? 'success' : 'default'}
+                        label={device.status}
+                        color={statusColor(device.status)}
                         size="small"
-                        variant={online ? 'filled' : 'outlined'}
+                        variant={device.status === 'Offline' ? 'outlined' : 'filled'}
                       />
                     </TableCell>
                   </TableRow>
