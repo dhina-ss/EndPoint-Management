@@ -126,6 +126,12 @@ namespace EMS.API.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ActivatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -207,6 +213,8 @@ namespace EMS.API.Data.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActivatedByUserId");
 
                     b.HasIndex("DeviceId")
                         .IsUnique();
@@ -500,6 +508,16 @@ namespace EMS.API.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.Device", b =>
+                {
+                    b.HasOne("EMS.API.Entities.AppUser", "ActivatedByUser")
+                        .WithMany()
+                        .HasForeignKey("ActivatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ActivatedByUser");
                 });
 
             modelBuilder.Entity("EMS.API.Entities.DeviceAuthentication", b =>

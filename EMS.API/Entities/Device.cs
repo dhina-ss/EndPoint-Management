@@ -62,4 +62,15 @@ public class Device
 
     /// <summary>The device's API credential; created at first registration.</summary>
     public DeviceAuthentication? Authentication { get; set; }
+
+    /// <summary>
+    /// The EMS user who activated this device (entered their employee code and
+    /// password in the agent's activation window). Null until activated.
+    /// </summary>
+    public Guid? ActivatedByUserId { get; set; }
+
+    public AppUser? ActivatedByUser { get; set; }
+
+    /// <summary>When the device was first activated by that user.</summary>
+    public DateTime? ActivatedAt { get; set; }
 }

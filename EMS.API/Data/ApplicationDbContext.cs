@@ -76,6 +76,13 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(d => d.StoreGatingEnabled)
                 .HasDefaultValue(false);
+
+            // The user who activated this device. Keep the device if that user
+            // is later removed - just clear the link.
+            entity.HasOne(d => d.ActivatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.ActivatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<DeviceAuthentication>(entity =>
