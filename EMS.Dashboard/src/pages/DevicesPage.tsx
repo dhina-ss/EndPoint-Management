@@ -75,7 +75,14 @@ export default function DevicesPage() {
     }
 
     return devices.filter((device) =>
-      [device.deviceName, device.username, device.osVersion, device.ipAddress]
+      [
+        device.deviceName,
+        device.username,
+        device.activatedByName,
+        device.activatedByEmployeeCode,
+        device.osVersion,
+        device.ipAddress,
+      ]
         .filter((value): value is string => value !== null)
         .some((value) => value.toLowerCase().includes(term)),
     );
@@ -192,7 +199,14 @@ export default function DevicesPage() {
                         {device.manufacturer} {device.model}
                       </Typography>
                     </TableCell>
-                    <TableCell>{device.username ?? '—'}</TableCell>
+                    <TableCell>
+                      {device.activatedByName ?? device.username ?? '—'}
+                      {device.activatedByEmployeeCode && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {device.activatedByEmployeeCode}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {device.osVersion ?? '—'}
                       {device.osBuildNumber && (

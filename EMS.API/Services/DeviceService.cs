@@ -8,15 +8,18 @@ public class DeviceService : IDeviceService
 {
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceAuthService _deviceAuthService;
+    private readonly IUserRepository _userRepository;
     private readonly ILogger<DeviceService> _logger;
 
     public DeviceService(
         IDeviceRepository deviceRepository,
         IDeviceAuthService deviceAuthService,
+        IUserRepository userRepository,
         ILogger<DeviceService> logger)
     {
         _deviceRepository = deviceRepository;
         _deviceAuthService = deviceAuthService;
+        _userRepository = userRepository;
         _logger = logger;
     }
 
@@ -47,6 +50,8 @@ public class DeviceService : IDeviceService
             // its inventory and LastSeen instead of failing on the unique DeviceId.
             ApplyInventory(device, request, utcNow);
         }
+
+        await MapActivatingUserAsync(device, request.ActivatedBy, utcNow, cancellationToken);
 
         await _deviceRepository.SaveChangesAsync(cancellationToken);
 
@@ -113,6 +118,42 @@ public class DeviceService : IDeviceService
         return MapToResponse(device);
     }
 
+    /// <summary>
+    /// Links the device to the EMS user that activated it (by the employee code
+    /// the agent reports from its local activation state). The password was
+    /// already verified when the user activated via the login window; here we
+    /// just record who it was. ActivatedAt is stamped once, on first mapping.
+    /// </summary>
+    private async Task MapActivatingUserAsync(
+        Device device, string? activatedBy, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(activatedBy))
+        {
+            return;
+        }
+
+        var user = await _userRepository.GetByLoginIdentifierAsync(activatedBy.Trim(), cancellationToken);
+        if (user is null)
+        {
+            _logger.LogWarning(
+                "Device {DeviceId} reported activation by '{ActivatedBy}', but no such user exists.",
+                device.DeviceId, activatedBy);
+            return;
+        }
+
+        if (device.ActivatedByUserId == user.Id)
+        {
+            return; // Already mapped to this user.
+        }
+
+        device.ActivatedByUserId = user.Id;
+        device.ActivatedAt ??= utcNow;
+
+        _logger.LogInformation(
+            "Device {DeviceId} mapped to user {Username} ({EmployeeCode}).",
+            device.DeviceId, user.Username, user.EmployeeCode);
+    }
+
     private static void ApplyInventory(Device device, DeviceRegisterRequest request, DateTime utcNow)
     {
         device.DeviceName = request.DeviceName;
@@ -156,7 +197,12 @@ public class DeviceService : IDeviceService
             LastSeen = device.LastSeen,
             LastHeartbeatTime = device.LastHeartbeatTime,
             UsbBlockingEnabled = device.UsbBlockingEnabled,
-            StoreGatingEnabled = device.StoreGatingEnabled
+            StoreGatingEnabled = device.StoreGatingEnabled,
+            ActivatedByUserId = device.ActivatedByUserId,
+            ActivatedByEmployeeCode = device.ActivatedByUser?.EmployeeCode,
+            ActivatedByName = device.ActivatedByUser?.Username,
+            ActivatedByEmail = device.ActivatedByUser?.Email,
+            ActivatedAt = device.ActivatedAt
         };
     }
 }

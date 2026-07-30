@@ -33,4 +33,10 @@ public class DeviceInventoryModel
     public string? Username { get; set; }
 
     public DateTime? LastBootTime { get; set; }
+
+    /// <summary>
+    /// Employee code of the EMS user who activated this device, from local
+    /// activation state. Lets the server map the device to that user.
+    /// </summary>
+    public string? ActivatedBy { get; set; }
 }

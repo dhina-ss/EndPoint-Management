@@ -46,4 +46,15 @@ public class DeviceResponse
     public bool UsbBlockingEnabled { get; set; }
 
     public bool StoreGatingEnabled { get; set; }
+
+    // The EMS user who activated the device (null until activated).
+    public Guid? ActivatedByUserId { get; set; }
+
+    public string? ActivatedByEmployeeCode { get; set; }
+
+    public string? ActivatedByName { get; set; }
+
+    public string? ActivatedByEmail { get; set; }
+
+    public DateTime? ActivatedAt { get; set; }
 }

@@ -50,7 +50,9 @@ public class ActivationLoginService : IActivationLoginService
                 return new ActivationLoginResult(false, result?.Message ?? "Invalid username or password.");
             }
 
-            _activationStore.Activate(result.Username ?? employeeCode.Trim());
+            // Store the employee code (what the user signed in with) so the
+            // server can map this device to that user on the next registration.
+            _activationStore.Activate(employeeCode.Trim());
             return new ActivationLoginResult(true, "EMS activated successfully.");
         }
         catch (HttpRequestException ex)

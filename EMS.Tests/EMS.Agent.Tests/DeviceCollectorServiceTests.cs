@@ -13,7 +13,16 @@ public class DeviceCollectorServiceTests
     {
         return new DeviceCollectorService(
             new FixedDeviceIdService(TestDeviceId),
+            new FakeActivationStore("EMP001"),
             NullLogger<DeviceCollectorService>.Instance);
+    }
+
+    [Fact]
+    public async Task CollectAsync_IncludesActivatingUser()
+    {
+        var inventory = await CreateService().CollectAsync();
+
+        Assert.Equal("EMP001", inventory.ActivatedBy);
     }
 
     [Fact]
@@ -48,5 +57,16 @@ public class DeviceCollectorServiceTests
 
         public Task<string> GetDeviceIdAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_deviceId);
+    }
+
+    private sealed class FakeActivationStore : IActivationStore
+    {
+        private readonly string _activatedBy;
+
+        public FakeActivationStore(string activatedBy) => _activatedBy = activatedBy;
+
+        public bool IsActivated() => true;
+        public string? ActivatedBy() => _activatedBy;
+        public void Activate(string activatedBy) { }
     }
 }

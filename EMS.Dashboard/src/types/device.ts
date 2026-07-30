@@ -21,6 +21,11 @@ export interface Device {
   lastHeartbeatTime: string | null;
   usbBlockingEnabled: boolean;
   storeGatingEnabled: boolean;
+  activatedByUserId: string | null;
+  activatedByEmployeeCode: string | null;
+  activatedByName: string | null;
+  activatedByEmail: string | null;
+  activatedAt: string | null;
 }
 
 /**

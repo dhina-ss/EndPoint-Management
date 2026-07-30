@@ -18,6 +18,7 @@ import IconButton from '@mui/material/IconButton';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ComputerIcon from '@mui/icons-material/Computer';
+import PersonIcon from '@mui/icons-material/Person';
 import LanIcon from '@mui/icons-material/Lan';
 import MemoryIcon from '@mui/icons-material/Memory';
 import ScheduleIcon from '@mui/icons-material/Schedule';
@@ -582,6 +583,22 @@ export default function DeviceDetailsPage() {
             <DetailRow label="Last Seen" value={formatDate(device.lastSeen)} />
             <DetailRow label="Registration Date" value={formatDate(device.createdDate)} />
             <DetailRow label="Last Inventory Update" value={formatDate(device.updatedDate)} />
+          </DetailCard>
+
+          <DetailCard title="Assigned User" icon={<PersonIcon color="primary" />}>
+            {device.activatedByUserId ? (
+              <>
+                <DetailRow label="Name" value={device.activatedByName} />
+                <DetailRow label="Employee Code" value={device.activatedByEmployeeCode} />
+                <DetailRow label="Email" value={device.activatedByEmail} />
+                <DetailRow label="Activated On" value={formatDate(device.activatedAt)} />
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 0.75 }}>
+                Not yet activated. The user who signs in through the agent's activation window
+                will be linked here.
+              </Typography>
+            )}
           </DetailCard>
         </Box>
       )}

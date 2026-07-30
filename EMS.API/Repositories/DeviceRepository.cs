@@ -23,6 +23,7 @@ public class DeviceRepository : IDeviceRepository
     {
         return await _dbContext.Devices
             .AsNoTracking()
+            .Include(d => d.ActivatedByUser)
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
     }
 
@@ -36,6 +37,7 @@ public class DeviceRepository : IDeviceRepository
     {
         return await _dbContext.Devices
             .AsNoTracking()
+            .Include(d => d.ActivatedByUser)
             .OrderBy(d => d.DeviceName)
             .ToListAsync(cancellationToken);
     }

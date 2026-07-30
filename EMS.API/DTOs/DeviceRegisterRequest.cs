@@ -52,4 +52,12 @@ public class DeviceRegisterRequest
     public string? Username { get; set; }
 
     public DateTime? LastBootTime { get; set; }
+
+    /// <summary>
+    /// Employee code (or username) of the EMS user who activated this device,
+    /// read from the agent's local activation state. Maps the device to that
+    /// user; null on unactivated agents.
+    /// </summary>
+    [MaxLength(100)]
+    public string? ActivatedBy { get; set; }
 }

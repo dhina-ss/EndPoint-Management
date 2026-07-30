@@ -12,11 +12,16 @@ namespace EMS.Agent.Services;
 public class DeviceCollectorService : IDeviceCollectorService
 {
     private readonly IDeviceIdService _deviceIdService;
+    private readonly IActivationStore _activationStore;
     private readonly ILogger<DeviceCollectorService> _logger;
 
-    public DeviceCollectorService(IDeviceIdService deviceIdService, ILogger<DeviceCollectorService> logger)
+    public DeviceCollectorService(
+        IDeviceIdService deviceIdService,
+        IActivationStore activationStore,
+        ILogger<DeviceCollectorService> logger)
     {
         _deviceIdService = deviceIdService;
+        _activationStore = activationStore;
         _logger = logger;
     }
 
@@ -29,6 +34,10 @@ public class DeviceCollectorService : IDeviceCollectorService
         // WMI has no async API; keep the caller's thread free.
         var inventory = await Task.Run(() => Collect(cancellationToken), cancellationToken);
         inventory.DeviceId = deviceId;
+
+        // Who activated this device (verified at the login window); lets the
+        // server map the device to that EMS user.
+        inventory.ActivatedBy = _activationStore.ActivatedBy();
 
         _logger.LogInformation(
             "Device inventory collection completed. DeviceId: {DeviceId}, DeviceName: {DeviceName}",
