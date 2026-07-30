@@ -87,6 +87,8 @@ if (args.Contains("--usage-tracker"))
 
     trackerBuilder.Services.AddAgentServices(trackerBuilder.Configuration);
     trackerBuilder.Services.AddHostedService<AppUsageWorker>();
+    // Per-user tray icon: green check when activated, red cross when not.
+    trackerBuilder.Services.AddHostedService<TrayIconWorker>();
     trackerBuilder.Build().Run();
     return;
 }
