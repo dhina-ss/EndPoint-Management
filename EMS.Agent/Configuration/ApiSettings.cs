@@ -50,6 +50,12 @@ public class ApiSettings
     /// <summary>Relative path of the installed-applications report endpoint.</summary>
     public string InstalledAppsEndpoint { get; set; } = "/api/devices/installed-apps";
 
+    /// <summary>Relative path of the working-time report endpoint.</summary>
+    public string WorkTimeEndpoint { get; set; } = "/api/devices/work-time";
+
+    /// <summary>Relative path of the power-state (sleep) beacon endpoint.</summary>
+    public string PowerStateEndpoint { get; set; } = "/api/devices/power-state";
+
     /// <summary>How often the agent samples the foreground application, in seconds.</summary>
     public int AppUsageSampleIntervalSeconds { get; set; } = 20;
 

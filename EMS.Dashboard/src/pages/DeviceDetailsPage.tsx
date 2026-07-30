@@ -46,6 +46,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InstallDesktopIcon from '@mui/icons-material/InstallDesktop';
 import HistoryIcon from '@mui/icons-material/History';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import {
   addBlockedWebsite,
   fetchAppUsage,
@@ -55,6 +56,7 @@ import {
   fetchDeviceMetrics,
   fetchInstalledApps,
   fetchNetworkUsage,
+  fetchWorkTime,
   queueInstall,
   removeBlockedWebsite,
   setStoreGating,
@@ -65,10 +67,11 @@ import { deletePackage, fetchPackages, uploadPackage } from '../api/packages';
 import {
   formatBytes,
   formatDuration,
+  formatHoursMinutes,
   formatRate,
   formatUptime,
   isCommandActive,
-  isOnline,
+  statusColor,
   type AppUsageEntry,
   type BlockedWebsite,
   type Device,
@@ -77,6 +80,7 @@ import {
   type InstalledApp,
   type InstallerPackage,
   type NetworkUsageEntry,
+  type WorkTimeEntry,
 } from '../types/device';
 
 const COMMAND_STATUS_COLOR: Record<
@@ -189,6 +193,7 @@ export default function DeviceDetailsPage() {
   const [metricsError, setMetricsError] = useState<string | null>(null);
 
   const [networkUsage, setNetworkUsage] = useState<NetworkUsageEntry[]>([]);
+  const [workTime, setWorkTime] = useState<WorkTimeEntry[]>([]);
 
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
   const [appSearch, setAppSearch] = useState('');
@@ -284,6 +289,17 @@ export default function DeviceDetailsPage() {
     }
   }, [id]);
 
+  const loadWorkTime = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      setWorkTime(await fetchWorkTime(id, 7));
+    } catch {
+      // Non-critical panel; leave it empty on error.
+    }
+  }, [id]);
+
   const loadInstalledApps = useCallback(async () => {
     if (!id) {
       return;
@@ -323,6 +339,7 @@ export default function DeviceDetailsPage() {
     void loadCommands();
     void loadPackages();
     void loadNetworkUsage();
+    void loadWorkTime();
   }, [
     loadDevice,
     loadAppUsage,
@@ -332,6 +349,7 @@ export default function DeviceDetailsPage() {
     loadCommands,
     loadPackages,
     loadNetworkUsage,
+    loadWorkTime,
   ]);
 
   // Commands change state on the device asynchronously (queued -> dispatched ->
@@ -355,9 +373,10 @@ export default function DeviceDetailsPage() {
     const timer = window.setInterval(() => {
       void loadMetrics();
       void loadNetworkUsage();
+      void loadWorkTime();
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [loadMetrics, loadNetworkUsage]);
+  }, [loadMetrics, loadNetworkUsage, loadWorkTime]);
 
   const handleAddBlockedSite = async () => {
     if (!id || !newDomain.trim()) {
@@ -485,7 +504,6 @@ export default function DeviceDetailsPage() {
     }
   };
 
-  const online = device ? isOnline(device) : false;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -507,10 +525,10 @@ export default function DeviceDetailsPage() {
                   {device.deviceName}
                 </Typography>
                 <Chip
-                  label={online ? 'Online' : 'Offline'}
-                  color={online ? 'success' : 'default'}
+                  label={device.status}
+                  color={statusColor(device.status)}
                   size="small"
-                  variant={online ? 'filled' : 'outlined'}
+                  variant={device.status === 'Offline' ? 'outlined' : 'filled'}
                 />
               </Stack>
               <Typography variant="caption" color="text.secondary">
@@ -618,10 +636,10 @@ export default function DeviceDetailsPage() {
                   Live Monitoring
                 </Typography>
                 <Chip
-                  label={metrics?.isOnline ? 'Online' : 'Offline'}
-                  color={metrics?.isOnline ? 'success' : 'default'}
+                  label={metrics?.status ?? 'Offline'}
+                  color={statusColor(metrics?.status ?? 'Offline')}
                   size="small"
-                  variant={metrics?.isOnline ? 'filled' : 'outlined'}
+                  variant={(metrics?.status ?? 'Offline') === 'Offline' ? 'outlined' : 'filled'}
                 />
               </Stack>
               <Typography variant="caption" color="text.secondary">
@@ -993,6 +1011,80 @@ export default function DeviceDetailsPage() {
                     );
                   })}
               </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {device && !loading && (
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <AccessTimeIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                Working Hours
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                last 7 days
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 1.5 }} />
+
+            {workTime.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                No working time recorded yet. The timer runs while the user is signed in and awake,
+                and pauses when the screen locks or the device sleeps.
+              </Typography>
+            ) : (
+              (() => {
+                const todayLocal = new Date().toLocaleDateString('en-CA');
+                const today = workTime.find((w) => w.workDate.slice(0, 10) === todayLocal);
+                const total7 = workTime.reduce((s, w) => s + w.workedSeconds, 0);
+                const maxDay = Math.max(...workTime.map((w) => w.workedSeconds), 1);
+                return (
+                  <>
+                    <Stack direction="row" spacing={3} sx={{ mb: 1.5 }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Today
+                        </Typography>
+                        <Typography variant="h6">
+                          {formatHoursMinutes(today?.workedSeconds ?? 0)}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          7-day total
+                        </Typography>
+                        <Typography variant="h6">{formatHoursMinutes(total7)}</Typography>
+                      </Box>
+                    </Stack>
+                    <Stack spacing={1}>
+                      {workTime.map((w) => (
+                        <Box key={w.workDate}>
+                          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                            <Typography variant="body2">
+                              {new Date(w.workDate).toLocaleDateString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {formatHoursMinutes(w.workedSeconds)}
+                            </Typography>
+                          </Stack>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.round((w.workedSeconds / maxDay) * 100)}
+                            sx={{ height: 6, borderRadius: 3 }}
+                          />
+                        </Box>
+                      ))}
+                    </Stack>
+                  </>
+                );
+              })()
             )}
           </CardContent>
         </Card>

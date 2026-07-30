@@ -6,6 +6,7 @@ import type {
   DeviceMetrics,
   InstalledApp,
   NetworkUsageEntry,
+  WorkTimeEntry,
 } from '../types/device';
 import { API_BASE, credentialHeaders, throwForStatus } from './client';
 
@@ -171,6 +172,19 @@ export async function fetchNetworkUsage(id: string, days = 7): Promise<NetworkUs
   }
 
   return (await response.json()) as NetworkUsageEntry[];
+}
+
+export async function fetchWorkTime(id: string, days = 7): Promise<WorkTimeEntry[]> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(id)}/work-time?days=${days}`,
+    { headers: credentialHeaders },
+  );
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as WorkTimeEntry[];
 }
 
 export async function fetchBlockedWebsites(id: string): Promise<BlockedWebsite[]> {

@@ -16,17 +16,23 @@ public class AppUsageWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IAppUsageTrackerService _tracker;
+    private readonly IWorkTimeTracker _workTimeTracker;
+    private readonly ISessionStateService _sessionState;
     private readonly ApiSettings _apiSettings;
     private readonly ILogger<AppUsageWorker> _logger;
 
     public AppUsageWorker(
         IServiceScopeFactory scopeFactory,
         IAppUsageTrackerService tracker,
+        IWorkTimeTracker workTimeTracker,
+        ISessionStateService sessionState,
         IOptions<ApiSettings> apiSettings,
         ILogger<AppUsageWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _tracker = tracker;
+        _workTimeTracker = workTimeTracker;
+        _sessionState = sessionState;
         _apiSettings = apiSettings.Value;
         _logger = logger;
     }
@@ -41,6 +47,9 @@ public class AppUsageWorker : BackgroundService
             sampleInterval.TotalSeconds, uploadInterval.TotalMinutes);
 
         var elapsedSinceUpload = TimeSpan.Zero;
+
+        // Fire the sleep beacon when the machine suspends (best-effort).
+        _sessionState.Suspending += OnSuspending;
 
         try
         {
@@ -66,8 +75,28 @@ public class AppUsageWorker : BackgroundService
         }
         finally
         {
+            _sessionState.Suspending -= OnSuspending;
             _logger.LogInformation("App usage worker stopped.");
         }
+    }
+
+    private void OnSuspending()
+    {
+        // Runs on the SystemEvents thread; kick off a quick best-effort beacon
+        // without blocking the suspend.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+                await apiClient.SendPowerStateAsync(suspended: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Suspend beacon failed.");
+            }
+        });
     }
 
     private void Sample(TimeSpan tickDuration)
@@ -80,12 +109,23 @@ public class AppUsageWorker : BackgroundService
         {
             _logger.LogWarning(ex, "App usage sampling failed for this tick.");
         }
+
+        try
+        {
+            _workTimeTracker.Sample(tickDuration);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Work-time sampling failed for this tick.");
+        }
     }
 
     private async Task UploadUsageAsync(CancellationToken cancellationToken)
     {
         var usage = _tracker.FlushUsage();
-        if (usage.Count == 0)
+        var workTime = _workTimeTracker.FlushDeltas();
+
+        if (usage.Count == 0 && workTime.Count == 0)
         {
             return;
         }
@@ -94,22 +134,36 @@ public class AppUsageWorker : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
-            var sent = await apiClient.SendAppUsageAsync(usage, cancellationToken);
 
-            if (sent)
+            if (usage.Count > 0)
             {
-                _logger.LogInformation("Uploaded usage for {Count} application(s).", usage.Count);
+                if (await apiClient.SendAppUsageAsync(usage, cancellationToken))
+                {
+                    _logger.LogInformation("Uploaded usage for {Count} application(s).", usage.Count);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Failed to upload app usage for {Count} application(s); this period's data is not retried.",
+                        usage.Count);
+                }
             }
-            else
+
+            if (workTime.Count > 0)
             {
-                _logger.LogWarning(
-                    "Failed to upload app usage for {Count} application(s); this period's data is not retried.",
-                    usage.Count);
+                if (await apiClient.SendWorkTimeAsync(workTime, cancellationToken))
+                {
+                    _logger.LogInformation("Uploaded working time for {Count} day(s).", workTime.Count);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to upload working time; this period's data is not retried.");
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "App usage upload failed.");
+            _logger.LogWarning(ex, "Usage/work-time upload failed.");
         }
     }
 }

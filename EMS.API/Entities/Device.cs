@@ -73,4 +73,10 @@ public class Device
 
     /// <summary>When the device was first activated by that user.</summary>
     public DateTime? ActivatedAt { get; set; }
+
+    /// <summary>
+    /// Set when the agent signals the machine is suspending (sleep); cleared on
+    /// the next heartbeat. Drives the "Sleep" device status.
+    /// </summary>
+    public DateTime? SuspendedAt { get; set; }
 }

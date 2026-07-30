@@ -15,6 +15,9 @@ public class DeviceMetricsResponse
     /// </summary>
     public bool IsOnline { get; set; }
 
+    /// <summary>"Online", "Sleep", or "Offline".</summary>
+    public string Status { get; set; } = "Offline";
+
     public double? CpuUsagePercent { get; set; }
 
     public double? MemoryUsagePercent { get; set; }

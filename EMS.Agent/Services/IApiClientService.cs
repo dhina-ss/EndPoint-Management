@@ -22,6 +22,15 @@ public interface IApiClientService
     /// </summary>
     Task<bool> SendAppUsageAsync(IReadOnlyList<AppUsageModel> usage, CancellationToken cancellationToken = default);
 
+    /// <summary>Sends per-day working-time deltas. Returns false if not registered.</summary>
+    Task<bool> SendWorkTimeAsync(IReadOnlyList<WorkTimeModel> sessions, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Best-effort beacon that the device is suspending (for the sleep status).
+    /// Fire-and-forget; failures are ignored.
+    /// </summary>
+    Task SendPowerStateAsync(bool suspended, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Reports the full installed-application inventory. Returns false
     /// (without calling the server) when the agent has not registered yet.
