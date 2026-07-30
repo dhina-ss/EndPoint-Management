@@ -9,17 +9,20 @@ public class HeartbeatService : IHeartbeatService
     private readonly IDeviceRepository _deviceRepository;
     private readonly IHeartbeatRepository _heartbeatRepository;
     private readonly IBlockedWebsiteRepository _blockedWebsiteRepository;
+    private readonly INetworkUsageRepository _networkUsageRepository;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
         IDeviceRepository deviceRepository,
         IHeartbeatRepository heartbeatRepository,
         IBlockedWebsiteRepository blockedWebsiteRepository,
+        INetworkUsageRepository networkUsageRepository,
         ILogger<HeartbeatService> logger)
     {
         _deviceRepository = deviceRepository;
         _heartbeatRepository = heartbeatRepository;
         _blockedWebsiteRepository = blockedWebsiteRepository;
+        _networkUsageRepository = networkUsageRepository;
         _logger = logger;
     }
 
@@ -57,8 +60,11 @@ public class HeartbeatService : IHeartbeatService
         ApplyMetrics(heartbeat, request.Metrics);
         await _heartbeatRepository.AddAsync(heartbeat, cancellationToken);
 
-        // One SaveChanges persists both the heartbeat row and the updated
-        // device timestamps — they share the scoped DbContext.
+        await AccumulateNetworkUsageAsync(device.Id, request.Metrics, utcNow, cancellationToken);
+
+        // One SaveChanges persists the heartbeat row, the updated device
+        // timestamps, and the network-usage upsert — they share the scoped
+        // DbContext.
         await _heartbeatRepository.SaveChangesAsync(cancellationToken);
 
         var blockedWebsites = await _blockedWebsiteRepository.GetByDeviceAsync(device.Id, cancellationToken);
@@ -117,6 +123,65 @@ public class HeartbeatService : IHeartbeatService
             BatteryCharging = latest.BatteryCharging,
             HasBattery = latest.HasBattery
         };
+    }
+
+    /// <summary>
+    /// Adds this heartbeat's byte deltas to the device's running total for
+    /// today (UTC), inserting the day's row on first sight. Added to the shared
+    /// DbContext; the caller's SaveChanges persists it.
+    /// </summary>
+    private async Task AccumulateNetworkUsageAsync(
+        Guid deviceId, SystemMetricsPayload? metrics, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        var sent = metrics?.NetworkBytesSentDelta ?? 0;
+        var received = metrics?.NetworkBytesReceivedDelta ?? 0;
+        if (sent <= 0 && received <= 0)
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(utcNow);
+        var record = await _networkUsageRepository.GetTrackedAsync(deviceId, today, cancellationToken);
+
+        if (record is null)
+        {
+            await _networkUsageRepository.AddAsync(new NetworkUsageRecord
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = deviceId,
+                UsageDate = today,
+                BytesSent = sent,
+                BytesReceived = received,
+                LastUpdated = utcNow
+            }, cancellationToken);
+        }
+        else
+        {
+            record.BytesSent += sent;
+            record.BytesReceived += received;
+            record.LastUpdated = utcNow;
+        }
+    }
+
+    /// <summary>Daily network-usage totals for a device over the last N days.</summary>
+    public async Task<IReadOnlyList<NetworkUsageResponse>?> GetNetworkUsageAsync(
+        Guid deviceInternalId, int days, CancellationToken cancellationToken = default)
+    {
+        var device = await _deviceRepository.GetByIdAsync(deviceInternalId, cancellationToken);
+        if (device is null)
+        {
+            return null;
+        }
+
+        var fromDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-(Math.Max(1, days) - 1));
+        var records = await _networkUsageRepository.GetByDeviceSinceAsync(deviceInternalId, fromDate, cancellationToken);
+
+        return records.Select(r => new NetworkUsageResponse
+        {
+            UsageDate = r.UsageDate,
+            BytesSent = r.BytesSent,
+            BytesReceived = r.BytesReceived
+        }).ToList();
     }
 
     private static void ApplyMetrics(DeviceHeartbeat heartbeat, SystemMetricsPayload? metrics)

@@ -27,6 +27,12 @@ public class SystemMetricsModel
     /// <summary>Receive rate since the previous sample, in KB/s.</summary>
     public double? NetworkReceivedKbps { get; set; }
 
+    /// <summary>Bytes sent since the previous sample - this interval's usage.</summary>
+    public long? NetworkBytesSentDelta { get; set; }
+
+    /// <summary>Bytes received since the previous sample - this interval's usage.</summary>
+    public long? NetworkBytesReceivedDelta { get; set; }
+
     /// <summary>Seconds since the machine last booted.</summary>
     public long? UptimeSeconds { get; set; }
 

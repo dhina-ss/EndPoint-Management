@@ -451,6 +451,35 @@ namespace EMS.API.Data.Migrations
                     b.ToTable("installer_packages", (string)null);
                 });
 
+            modelBuilder.Entity("EMS.API.Entities.NetworkUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("BytesReceived")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("BytesSent")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("UsageDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "UsageDate")
+                        .IsUnique();
+
+                    b.ToTable("network_usage_records", (string)null);
+                });
+
             modelBuilder.Entity("EMS.API.Entities.AppUsageRecord", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
@@ -514,6 +543,17 @@ namespace EMS.API.Data.Migrations
                 });
 
             modelBuilder.Entity("EMS.API.Entities.InstalledApplication", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.NetworkUsageRecord", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()

@@ -5,6 +5,7 @@ import type {
   DeviceCommand,
   DeviceMetrics,
   InstalledApp,
+  NetworkUsageEntry,
 } from '../types/device';
 import { API_BASE, credentialHeaders, throwForStatus } from './client';
 
@@ -157,6 +158,19 @@ export async function fetchDeviceMetrics(id: string): Promise<DeviceMetrics> {
   }
 
   return (await response.json()) as DeviceMetrics;
+}
+
+export async function fetchNetworkUsage(id: string, days = 7): Promise<NetworkUsageEntry[]> {
+  const response = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(id)}/network-usage?days=${days}`,
+    { headers: credentialHeaders },
+  );
+
+  if (!response.ok) {
+    throwForStatus(response.status);
+  }
+
+  return (await response.json()) as NetworkUsageEntry[];
 }
 
 export async function fetchBlockedWebsites(id: string): Promise<BlockedWebsite[]> {

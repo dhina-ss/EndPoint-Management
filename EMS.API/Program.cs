@@ -61,6 +61,7 @@ builder.Services.AddScoped<IBlockedWebsiteRepository, BlockedWebsiteRepository>(
 builder.Services.AddScoped<IApplicationInventoryRepository, ApplicationInventoryRepository>();
 builder.Services.AddScoped<IInstallerPackageRepository, InstallerPackageRepository>();
 builder.Services.AddScoped<IDeviceCommandRepository, DeviceCommandRepository>();
+builder.Services.AddScoped<INetworkUsageRepository, NetworkUsageRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();

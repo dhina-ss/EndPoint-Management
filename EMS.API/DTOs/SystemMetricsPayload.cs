@@ -25,6 +25,12 @@ public class SystemMetricsPayload
 
     public double? NetworkReceivedKbps { get; set; }
 
+    /// <summary>Bytes sent since the previous sample; accumulated into daily usage.</summary>
+    public long? NetworkBytesSentDelta { get; set; }
+
+    /// <summary>Bytes received since the previous sample; accumulated into daily usage.</summary>
+    public long? NetworkBytesReceivedDelta { get; set; }
+
     public long? UptimeSeconds { get; set; }
 
     public int? BatteryPercent { get; set; }

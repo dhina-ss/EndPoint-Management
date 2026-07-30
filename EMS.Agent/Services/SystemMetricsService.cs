@@ -92,8 +92,15 @@ public class SystemMetricsService : ISystemMetricsService
                 // skip this reading rather than reporting a bogus spike.
                 if (elapsedSeconds > 0 && bytesSent >= _lastBytesSent && bytesReceived >= _lastBytesReceived)
                 {
-                    metrics.NetworkSentKbps = Round((bytesSent - _lastBytesSent) / 1024d / elapsedSeconds);
-                    metrics.NetworkReceivedKbps = Round((bytesReceived - _lastBytesReceived) / 1024d / elapsedSeconds);
+                    var sentDelta = bytesSent - _lastBytesSent;
+                    var receivedDelta = bytesReceived - _lastBytesReceived;
+
+                    metrics.NetworkSentKbps = Round(sentDelta / 1024d / elapsedSeconds);
+                    metrics.NetworkReceivedKbps = Round(receivedDelta / 1024d / elapsedSeconds);
+
+                    // Raw bytes this interval feed the server's daily usage total.
+                    metrics.NetworkBytesSentDelta = sentDelta;
+                    metrics.NetworkBytesReceivedDelta = receivedDelta;
                 }
             }
 
