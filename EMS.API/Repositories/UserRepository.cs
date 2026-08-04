@@ -33,6 +33,14 @@ public class UserRepository : IUserRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AppUser>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.AppUsers
+            .AsNoTracking()
+            .OrderByDescending(u => u.CreatedDate)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(AppUser user, CancellationToken cancellationToken = default)
     {
         await _dbContext.AppUsers.AddAsync(user, cancellationToken);

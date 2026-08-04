@@ -64,13 +64,21 @@ public class UserService : IUserService
 
         _logger.LogInformation("Dashboard user {Username} created ({Email}).", username, email);
 
-        return new CreateUserResult(CreateUserOutcome.Created, new UserResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            EmployeeCode = user.EmployeeCode,
-            Username = user.Username,
-            CreatedDate = user.CreatedDate
-        });
+        return new CreateUserResult(CreateUserOutcome.Created, ToResponse(user));
     }
+
+    public async Task<IReadOnlyList<UserResponse>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await _repository.GetAllAsync(cancellationToken);
+        return users.Select(ToResponse).ToList();
+    }
+
+    private static UserResponse ToResponse(AppUser user) => new()
+    {
+        Id = user.Id,
+        Email = user.Email,
+        EmployeeCode = user.EmployeeCode,
+        Username = user.Username,
+        CreatedDate = user.CreatedDate
+    };
 }

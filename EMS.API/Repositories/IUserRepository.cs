@@ -14,6 +14,9 @@ public interface IUserRepository
     /// <summary>Finds a user by employee code, username, or email (case-insensitive) for sign-in.</summary>
     Task<AppUser?> GetByLoginIdentifierAsync(string identifier, CancellationToken cancellationToken = default);
 
+    /// <summary>All users, newest first.</summary>
+    Task<IReadOnlyList<AppUser>> GetAllAsync(CancellationToken cancellationToken = default);
+
     Task AddAsync(AppUser user, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

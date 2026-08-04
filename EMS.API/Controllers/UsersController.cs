@@ -40,4 +40,14 @@ public class UsersController : ControllerBase
             _ => Conflict(new { message = result.Error })
         };
     }
+
+    /// <summary>Lists dashboard users (newest first).</summary>
+    [HttpGet]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<UserResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetAll(CancellationToken cancellationToken)
+    {
+        return Ok(await _userService.GetAllAsync(cancellationToken));
+    }
 }

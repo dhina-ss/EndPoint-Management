@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/api/devices.ts","./src/api/packages.ts","./src/api/users.ts","./src/pages/createuserpage.tsx","./src/pages/devicedetailspage.tsx","./src/pages/devicespage.tsx","./src/types/device.ts"],"version":"5.6.3"}
