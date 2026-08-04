@@ -5,6 +5,8 @@ namespace EMS.API.Services;
 public interface IUserService
 {
     Task<CreateUserResult> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UserResponse>> GetAllAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateUserResult(

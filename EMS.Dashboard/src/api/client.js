@@ -1,9 +1,8 @@
-// Shared API configuration. Empty base URL = same origin (the Vite dev
-// server proxies /api to EMS.API); set VITE_API_URL for a hosted backend.
+// Shared API configuration for the EMS backend.
+// VITE_API_URL points at the API (empty = same origin). Device credentials are
+// the dashboard's read/observer credential, set in EMS.Dashboard/.env.local.
 export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
-// Every endpoint currently requires device credentials, until the API grows
-// a proper admin sign-in. Configure an observer credential in .env.local.
 const DEVICE_ID = import.meta.env.VITE_API_DEVICE_ID ?? '';
 const DEVICE_TOKEN = import.meta.env.VITE_API_DEVICE_TOKEN ?? '';
 
@@ -12,7 +11,12 @@ export const credentialHeaders = {
   'X-Device-Token': DEVICE_TOKEN,
 };
 
-export function throwForStatus(status: number): never {
+export const jsonHeaders = {
+  ...credentialHeaders,
+  'Content-Type': 'application/json',
+};
+
+export function throwForStatus(status) {
   if (status === 401) {
     throw new Error(
       'Unauthorized. Set VITE_API_DEVICE_ID and VITE_API_DEVICE_TOKEN in EMS.Dashboard/.env.local.',
