@@ -158,6 +158,24 @@ namespace EMS.API.Data.Migrations
                     b.Property<DateTime>("LastSeen")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LocationCity")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LocationCountry")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LocationRegion")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("LocationUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("MACAddress")
                         .HasMaxLength(17)
                         .HasColumnType("character varying(17)");
@@ -181,6 +199,9 @@ namespace EMS.API.Data.Migrations
                     b.Property<string>("Processor")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PublicIPAddress")
+                        .HasColumnType("text");
 
                     b.Property<string>("RamSize")
                         .HasMaxLength(50)

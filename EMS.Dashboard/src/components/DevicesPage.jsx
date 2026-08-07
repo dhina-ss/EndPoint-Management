@@ -351,7 +351,14 @@ export default function DevicesPage() {
 												<span className="font-medium text-on-surface block">{dev.userName || dev.user}</span>
 												{dev.empCode && <span className="text-[12px] text-on-surface-variant">{dev.empCode}</span>}
 											</td>
-											<td className="px-lg py-4 font-mono text-[14px] text-on-surface-variant">{dev.ip}</td>
+											<td className="px-lg py-4 font-mono text-[14px] text-on-surface-variant">
+												{dev.ip}
+												{dev.locationLabel && (
+													<span className="block font-sans text-[11px] text-on-surface-variant flex items-center gap-0.5">
+														<span className="material-symbols-outlined text-[13px]">location_on</span>{dev.city || dev.country}
+													</span>
+												)}
+											</td>
 											<td className="px-lg py-4"><span className="font-medium text-on-surface block">{dev.os}</span></td>
 											<td className="px-lg py-4 text-[13px] text-on-surface-variant font-medium">{dev.lastSync}</td>
 											<td className="px-lg py-4 text-center">
@@ -504,6 +511,44 @@ export default function DevicesPage() {
 										</button>
 									</div>
 								</div>
+							</div>
+
+							{/* Location */}
+							<div className="bg-surface-container-high/40 p-5 rounded-2xl border border-outline-variant/40 space-y-4">
+								<div className="flex items-center justify-between">
+									<SectionTitle icon="location_on" text="Approximate Location" />
+									{inspectDevice.locationLabel && (
+										<span className="px-3 py-1 bg-primary/10 text-primary font-bold text-[11px] rounded-full">{inspectDevice.locationLabel}</span>
+									)}
+								</div>
+								{inspectDevice.latitude != null && inspectDevice.longitude != null ? (
+									<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+										<div className="grid grid-cols-2 gap-4 text-[13px] content-start">
+											<Field label="City" value={inspectDevice.city || '—'} />
+											<Field label="Region" value={inspectDevice.region || '—'} />
+											<Field label="Country" value={inspectDevice.country || '—'} />
+											<Field label="Public IP" value={inspectDevice.publicIp || '—'} mono />
+											<Field label="Coordinates" value={`${inspectDevice.latitude.toFixed(4)}, ${inspectDevice.longitude.toFixed(4)}`} mono />
+											<div>
+												<span className="text-[11px] text-on-surface-variant block uppercase font-medium mb-0.5">Map</span>
+												<a href={`https://www.openstreetmap.org/?mlat=${inspectDevice.latitude}&mlon=${inspectDevice.longitude}#map=12/${inspectDevice.latitude}/${inspectDevice.longitude}`} target="_blank" rel="noreferrer" className="text-primary font-semibold text-[13px] hover:underline">Open in OpenStreetMap</a>
+											</div>
+										</div>
+										<div className="rounded-2xl overflow-hidden border border-outline-variant/40 h-56 bg-surface-container-high">
+											<iframe
+												title="Device location"
+												className="w-full h-full"
+												loading="lazy"
+												src={`https://www.openstreetmap.org/export/embed.html?bbox=${inspectDevice.longitude - 0.08}%2C${inspectDevice.latitude - 0.06}%2C${inspectDevice.longitude + 0.08}%2C${inspectDevice.latitude + 0.06}&layer=mapnik&marker=${inspectDevice.latitude}%2C${inspectDevice.longitude}`}
+											/>
+										</div>
+									</div>
+								) : (
+									<p className="text-[12px] text-on-surface-variant">
+										No location yet. It resolves from the device's public IP on its next heartbeat
+										after this update is deployed (private/office IPs may not geolocate).
+									</p>
+								)}
 							</div>
 
 							{/* Website filter */}

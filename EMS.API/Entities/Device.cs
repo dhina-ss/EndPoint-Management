@@ -79,4 +79,22 @@ public class Device
     /// the next heartbeat. Drives the "Sleep" device status.
     /// </summary>
     public DateTime? SuspendedAt { get; set; }
+
+    // ---- Approximate location, resolved from the device's public IP ----
+
+    /// <summary>The device's public (internet-facing) IP, seen on heartbeat.</summary>
+    public string? PublicIPAddress { get; set; }
+
+    public string? LocationCity { get; set; }
+
+    public string? LocationRegion { get; set; }
+
+    public string? LocationCountry { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
+
+    /// <summary>When the location was last resolved (on a public-IP change).</summary>
+    public DateTime? LocationUpdatedAt { get; set; }
 }

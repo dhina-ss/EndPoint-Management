@@ -204,7 +204,14 @@ public class DeviceService : IDeviceService
             ActivatedByEmployeeCode = device.ActivatedByUser?.EmployeeCode,
             ActivatedByName = device.ActivatedByUser?.Username,
             ActivatedByEmail = device.ActivatedByUser?.Email,
-            ActivatedAt = device.ActivatedAt
+            ActivatedAt = device.ActivatedAt,
+            PublicIPAddress = device.PublicIPAddress,
+            LocationCity = device.LocationCity,
+            LocationRegion = device.LocationRegion,
+            LocationCountry = device.LocationCountry,
+            Latitude = device.Latitude,
+            Longitude = device.Longitude,
+            LocationUpdatedAt = device.LocationUpdatedAt
         };
     }
 }

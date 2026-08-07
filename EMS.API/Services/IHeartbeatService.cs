@@ -10,7 +10,8 @@ public interface IHeartbeatService
     /// does not exist.
     /// </summary>
     Task<HeartbeatResponse?> RecordHeartbeatAsync(
-        string deviceId, HeartbeatRequest request, CancellationToken cancellationToken = default);
+        string deviceId, HeartbeatRequest request, string? publicIpAddress = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Latest live-monitoring snapshot for a device. Returns null when the

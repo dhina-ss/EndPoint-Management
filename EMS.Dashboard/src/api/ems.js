@@ -88,6 +88,15 @@ export function mapDevice(d) {
     lastInventoryUpdate: relativeTime(d.updatedDate),
     usbBlocking: d.usbBlockingEnabled,
     storeGating: d.storeGatingEnabled,
+    publicIp: d.publicIPAddress,
+    city: d.locationCity,
+    region: d.locationRegion,
+    country: d.locationCountry,
+    latitude: d.latitude,
+    longitude: d.longitude,
+    locationLabel:
+      [d.locationCity, d.locationRegion, d.locationCountry].filter(Boolean).join(', ') || null,
+    locationUpdatedAt: d.locationUpdatedAt,
   };
 }
 
