@@ -32,11 +32,8 @@ public class HeartbeatController : ControllerBase
     {
         var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
 
-        // The public IP the request arrived from (ForwardedHeaders resolves it
-        // from X-Forwarded-For behind the platform proxy); used for geolocation.
-        var publicIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-
-        var response = await _heartbeatService.RecordHeartbeatAsync(deviceId, request, publicIp, cancellationToken);
+        var response = await _heartbeatService.RecordHeartbeatAsync(
+            deviceId, request, ResolveClientIp(), cancellationToken);
 
         if (response is null)
         {
@@ -49,5 +46,32 @@ public class HeartbeatController : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// The device's public IP, for geolocation. Behind the platform proxy the
+    /// connection's remote IP is an internal proxy address, so prefer the
+    /// leftmost X-Forwarded-For entry (the original client as the edge saw it).
+    /// </summary>
+    private string? ResolveClientIp()
+    {
+        var forwardedFor = Request.Headers["X-Forwarded-For"].ToString();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            var first = forwardedFor.Split(',')[0].Trim();
+            if (!string.IsNullOrWhiteSpace(first))
+            {
+                // Strip an optional :port (IPv4) while leaving bracketed IPv6 intact.
+                var colon = first.IndexOf(':');
+                if (colon > 0 && first.IndexOf(':', colon + 1) < 0 && !first.Contains('['))
+                {
+                    first = first[..colon];
+                }
+
+                return first;
+            }
+        }
+
+        return HttpContext.Connection.RemoteIpAddress?.ToString();
     }
 }
