@@ -73,10 +73,12 @@ builder.Services.AddScoped<IInstallerPackageService, InstallerPackageService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
 
-// City-level geolocation from a device's public IP (free ip-api.com service).
+// City-level geolocation from a device's public IP (ip-api.com) and reverse
+// geocoding of GPS fixes (Nominatim, which requires an identifying User-Agent).
 builder.Services.AddHttpClient<IGeoLocationService, GeoLocationService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(5);
+    client.Timeout = TimeSpan.FromSeconds(6);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("EMS-EndpointManagement/1.0");
 });
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();

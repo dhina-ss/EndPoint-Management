@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <!-- net8.0-windows + WinForms for the activation login window. The agent
-         is already Windows-only, so this only formalizes that. -->
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- net8.0-windows10.0.19041.0 + WinForms: WinForms powers the activation
+         login window; the Windows 10 SDK target additionally projects the WinRT
+         Windows.Devices.Geolocation API used for optional GPS location. The
+         agent is already Windows-only, so this only formalizes that. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <!-- GUI subsystem: never allocate a console window. The Worker SDK
          defaults to a console Exe, which flashes a CMD window whenever the

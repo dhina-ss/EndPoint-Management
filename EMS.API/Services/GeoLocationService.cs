@@ -14,6 +14,10 @@ public interface IGeoLocationService
     /// null when the address is private/unroutable or the lookup fails.
     /// </summary>
     Task<GeoLocation?> ResolveAsync(string? ipAddress, CancellationToken cancellationToken = default);
+
+    /// <summary>Reverse-geocodes GPS coordinates to a city/country, or null on failure.</summary>
+    Task<(string? City, string? Country)?> ReverseAsync(
+        double latitude, double longitude, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -92,6 +96,37 @@ public class GeoLocationService : IGeoLocationService
         }
     }
 
+    public async Task<(string? City, string? Country)?> ReverseAsync(
+        double latitude, double longitude, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Nominatim requires an identifying User-Agent (set on the HttpClient).
+            var url = $"https://nominatim.openstreetmap.org/reverse?lat={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                      $"&lon={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&format=json&zoom=10";
+            var result = await _httpClient.GetFromJsonAsync<NominatimResult>(url, cancellationToken);
+
+            var address = result?.Address;
+            if (address is null)
+            {
+                return null;
+            }
+
+            var city = address.City ?? address.Town ?? address.Village ?? address.County ?? address.State;
+            return (city, address.Country);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Reverse geocoding failed for {Lat},{Lon}.", latitude, longitude);
+            return null;
+        }
+    }
+
     private sealed record IpApiResult(
         string? Status, string? Message, string? Country, string? RegionName, string? City, double Lat, double Lon);
+
+    private sealed record NominatimResult(NominatimAddress? Address);
+
+    private sealed record NominatimAddress(
+        string? City, string? Town, string? Village, string? County, string? State, string? Country);
 }

@@ -334,6 +334,24 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
+    /// Agent report of a precise GPS location fix. Drives the device's effective
+    /// location (GPS overrides the approximate IP location).
+    /// </summary>
+    [HttpPost("location")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ReportLocation(
+        [FromBody] LocationReportRequest request, CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var ok = await _deviceService.SetGpsLocationAsync(
+            deviceId, request.Latitude, request.Longitude, request.AccuracyMeters, cancellationToken);
+        return ok ? NoContent() : NotFound();
+    }
+
+    /// <summary>
     /// Daily network data-usage totals (bytes sent/received) for a device over
     /// the last <c>days</c> days (default 7, UTC).
     /// </summary>

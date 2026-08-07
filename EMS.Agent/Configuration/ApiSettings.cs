@@ -56,6 +56,12 @@ public class ApiSettings
     /// <summary>Relative path of the power-state (sleep) beacon endpoint.</summary>
     public string PowerStateEndpoint { get; set; } = "/api/devices/power-state";
 
+    /// <summary>Relative path of the GPS location report endpoint.</summary>
+    public string LocationEndpoint { get; set; } = "/api/devices/location";
+
+    /// <summary>How often the agent reports a GPS location fix, in minutes.</summary>
+    public int LocationIntervalMinutes { get; set; } = 60;
+
     /// <summary>How often the agent samples the foreground application, in seconds.</summary>
     public int AppUsageSampleIntervalSeconds { get; set; } = 20;
 

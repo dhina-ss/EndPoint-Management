@@ -31,6 +31,10 @@ public interface IApiClientService
     /// </summary>
     Task SendPowerStateAsync(bool suspended, CancellationToken cancellationToken = default);
 
+    /// <summary>Reports a precise GPS location fix. Best-effort.</summary>
+    Task SendLocationAsync(double latitude, double longitude, double accuracyMeters,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Reports the full installed-application inventory. Returns false
     /// (without calling the server) when the agent has not registered yet.

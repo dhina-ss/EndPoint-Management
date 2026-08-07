@@ -259,6 +259,38 @@ public class ApiClientService : IApiClientService
         }
     }
 
+    public async Task SendLocationAsync(
+        double latitude, double longitude, double accuracyMeters, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.LocationEndpoint)
+            {
+                Content = JsonContent.Create(new { latitude, longitude, accuracyMeters })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Location report failed with status {StatusCode}.", (int)response.StatusCode);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Location report could not reach the EMS server.");
+        }
+    }
+
     public async Task<bool> SendInstalledAppsAsync(
         IReadOnlyList<InstalledAppModel> applications, CancellationToken cancellationToken = default)
     {

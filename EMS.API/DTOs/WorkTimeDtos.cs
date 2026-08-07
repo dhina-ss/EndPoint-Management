@@ -27,3 +27,11 @@ public class PowerStateRequest
 {
     public bool Suspended { get; set; }
 }
+
+/// <summary>A precise GPS location fix reported by the agent.</summary>
+public class LocationReportRequest
+{
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double AccuracyMeters { get; set; }
+}

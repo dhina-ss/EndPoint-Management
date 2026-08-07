@@ -145,6 +145,24 @@ namespace EMS.API.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<double?>("GpsAccuracyMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("GpsCity")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GpsCountry")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("GpsLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("GpsLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("GpsUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("IPAddress")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");

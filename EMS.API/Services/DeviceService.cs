@@ -9,18 +9,50 @@ public class DeviceService : IDeviceService
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceAuthService _deviceAuthService;
     private readonly IUserRepository _userRepository;
+    private readonly IGeoLocationService _geoLocationService;
     private readonly ILogger<DeviceService> _logger;
 
     public DeviceService(
         IDeviceRepository deviceRepository,
         IDeviceAuthService deviceAuthService,
         IUserRepository userRepository,
+        IGeoLocationService geoLocationService,
         ILogger<DeviceService> logger)
     {
         _deviceRepository = deviceRepository;
         _deviceAuthService = deviceAuthService;
         _userRepository = userRepository;
+        _geoLocationService = geoLocationService;
         _logger = logger;
+    }
+
+    public async Task<bool> SetGpsLocationAsync(
+        string deviceId, double latitude, double longitude, double accuracyMeters,
+        CancellationToken cancellationToken = default)
+    {
+        var device = await _deviceRepository.GetByDeviceIdAsync(deviceId, cancellationToken);
+        if (device is null)
+        {
+            return false;
+        }
+
+        device.GpsLatitude = latitude;
+        device.GpsLongitude = longitude;
+        device.GpsAccuracyMeters = accuracyMeters;
+        device.GpsUpdatedAt = DateTime.UtcNow;
+
+        // Reverse-geocode to a readable city/country (best-effort).
+        var place = await _geoLocationService.ReverseAsync(latitude, longitude, cancellationToken);
+        if (place is not null)
+        {
+            device.GpsCity = place.Value.City;
+            device.GpsCountry = place.Value.Country;
+        }
+
+        await _deviceRepository.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Device {DeviceId} GPS location updated: {City}, {Country}.", deviceId, device.GpsCity, device.GpsCountry);
+        return true;
     }
 
     public async Task<DeviceRegisterResponse> RegisterAsync(
@@ -176,7 +208,7 @@ public class DeviceService : IDeviceService
     private static DeviceResponse MapToResponse(Device device)
     {
         var utcNow = DateTime.UtcNow;
-        return new DeviceResponse
+        var response = new DeviceResponse
         {
             Status = DeviceStatusCalculator.Compute(device.LastHeartbeatTime, device.SuspendedAt, utcNow),
             Id = device.Id,
@@ -206,12 +238,35 @@ public class DeviceService : IDeviceService
             ActivatedByEmail = device.ActivatedByUser?.Email,
             ActivatedAt = device.ActivatedAt,
             PublicIPAddress = device.PublicIPAddress,
-            LocationCity = device.LocationCity,
-            LocationRegion = device.LocationRegion,
-            LocationCountry = device.LocationCountry,
-            Latitude = device.Latitude,
-            Longitude = device.Longitude,
             LocationUpdatedAt = device.LocationUpdatedAt
         };
+
+        // Effective location: prefer a recent GPS fix (precise, VPN-proof);
+        // otherwise fall back to the approximate IP location.
+        var gpsFresh = device.GpsLatitude is not null
+            && device.GpsUpdatedAt is not null
+            && utcNow - device.GpsUpdatedAt.Value < TimeSpan.FromHours(6);
+
+        if (gpsFresh)
+        {
+            response.LocationSource = "GPS";
+            response.Latitude = device.GpsLatitude;
+            response.Longitude = device.GpsLongitude;
+            response.GpsAccuracyMeters = device.GpsAccuracyMeters;
+            response.LocationCity = device.GpsCity ?? device.LocationCity;
+            response.LocationCountry = device.GpsCountry ?? device.LocationCountry;
+            response.LocationRegion = device.LocationRegion;
+        }
+        else if (device.Latitude is not null)
+        {
+            response.LocationSource = "IP";
+            response.Latitude = device.Latitude;
+            response.Longitude = device.Longitude;
+            response.LocationCity = device.LocationCity;
+            response.LocationRegion = device.LocationRegion;
+            response.LocationCountry = device.LocationCountry;
+        }
+
+        return response;
     }
 }

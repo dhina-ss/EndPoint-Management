@@ -15,4 +15,12 @@ public interface IDeviceService
 
     /// <summary>Updates the device's Microsoft Store gating policy. Returns null if the device does not exist.</summary>
     Task<DeviceResponse?> SetStoreGatingAsync(Guid id, bool enabled, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a precise GPS fix reported by the agent (device identified by its
+    /// external device-id string). Returns false if the device does not exist.
+    /// </summary>
+    Task<bool> SetGpsLocationAsync(
+        string deviceId, double latitude, double longitude, double accuracyMeters,
+        CancellationToken cancellationToken = default);
 }

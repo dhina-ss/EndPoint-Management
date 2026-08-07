@@ -8,16 +8,17 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.10"
+#define MyAppVersion "1.0.11"
 #define MyAppPublisher "Dhinakaran Sekar"
 #define MyAppExeName "EMS.Agent.exe"
 #define MyServiceName "EMSAgent"
 #define MyServiceDisplayName "EMS Endpoint Agent"
 #define MyUsageTaskName "EMS App Usage Tracker"
-; NOTE: the agent targets net8.0-windows (WinForms + GUI subsystem, no console),
-; so the publish output lives under net8.0-windows - NOT net8.0. Pointing this at
-; the old net8.0 folder silently ships a stale console-subsystem build.
-#define PublishDir "..\EMS.Agent\bin\Release\net8.0-windows\win-x64\publish"
+; NOTE: the agent targets net8.0-windows10.0.19041.0 (WinForms + GUI subsystem +
+; WinRT geolocation), so the publish output lives under that exact folder - NOT
+; net8.0 or plain net8.0-windows. Pointing this at the wrong folder silently
+; ships a stale build.
+#define PublishDir "..\EMS.Agent\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish"
 
 [Setup]
 ; Never change AppId between versions - it is how upgrades find the install.
