@@ -176,17 +176,24 @@ public class HeartbeatService : IHeartbeatService
     private async Task UpdateLocationAsync(
         Entities.Device device, string? publicIp, DateTime utcNow, CancellationToken cancellationToken)
     {
-        if (!GeoLocationService.IsPublicRoutable(publicIp))
+        if (string.IsNullOrWhiteSpace(publicIp))
         {
             return;
         }
 
         if (string.Equals(device.PublicIPAddress, publicIp, StringComparison.OrdinalIgnoreCase))
         {
-            return; // Same network; keep the existing location.
+            return; // Same IP as last time; keep the existing location.
         }
 
+        // Record whatever IP we resolved (useful on its own, and makes the
+        // resolution observable); only a public, routable IP can be geolocated.
         device.PublicIPAddress = publicIp;
+
+        if (!GeoLocationService.IsPublicRoutable(publicIp))
+        {
+            return;
+        }
 
         var location = await _geoLocationService.ResolveAsync(publicIp, cancellationToken);
         if (location is not null)
