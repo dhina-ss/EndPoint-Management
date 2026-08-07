@@ -137,11 +137,25 @@ using (var startupScope = app.Services.CreateScope())
         startupLogger.LogInformation(
             "Database connection verified: {Database} on {Host}.",
             dbConnection.Database, dbConnection.DataSource);
+    }
+    catch (Exception ex)
+    {
+        startupLogger.LogCritical(ex,
+            "Cannot connect to database {Database} on {Host}. " +
+            "Check ConnectionStrings:DefaultConnection (for Neon it must include 'SSL Mode=Require'). The API will not start.",
+            dbConnection.Database, dbConnection.DataSource);
+        return 1;
+    }
 
-        // Apply any pending migrations automatically so a deploy is always in
-        // sync with the code - the app and DB can never drift (which otherwise
-        // shows up as "column ... does not exist" 500s). EF takes a migration
-        // lock, so concurrent instances won't race.
+    // Apply pending migrations automatically so a deploy stays in sync with the
+    // code. This is best-effort and MUST NOT fail startup: if it can't complete
+    // (e.g. the schema was already applied out of band via ApplyAll.sql, or a
+    // transient error), the app still starts - a genuine gap then surfaces as a
+    // clear per-endpoint error, not a crash-looping deploy. Wrapped in the
+    // execution strategy because EnableRetryOnFailure otherwise rejects the
+    // migration's transaction.
+    try
+    {
         var pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
         if (pendingMigrations.Count > 0)
         {
@@ -149,18 +163,17 @@ using (var startupScope = app.Services.CreateScope())
                 "Applying {Count} pending migration(s): {Migrations}.",
                 pendingMigrations.Count, string.Join(", ", pendingMigrations));
 
-            await dbContext.Database.MigrateAsync();
+            var strategy = dbContext.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(() => dbContext.Database.MigrateAsync());
 
             startupLogger.LogInformation("Database migrations applied successfully.");
         }
     }
     catch (Exception ex)
     {
-        startupLogger.LogCritical(ex,
-            "Cannot connect to or migrate database {Database} on {Host}. " +
-            "Check ConnectionStrings:DefaultConnection (for Neon it must include 'SSL Mode=Require'). The API will not start.",
-            dbConnection.Database, dbConnection.DataSource);
-        return 1;
+        startupLogger.LogError(ex,
+            "Automatic migration did not complete; continuing startup. If an endpoint later errors " +
+            "with a missing column/table, apply installer/migrations/ApplyAll.sql to the database.");
     }
 }
 
