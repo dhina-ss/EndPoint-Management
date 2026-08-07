@@ -32,7 +32,11 @@ public class HeartbeatController : ControllerBase
     {
         var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
 
-        var response = await _heartbeatService.RecordHeartbeatAsync(deviceId, request, cancellationToken);
+        // The public IP the request arrived from (ForwardedHeaders resolves it
+        // from X-Forwarded-For behind the platform proxy); used for geolocation.
+        var publicIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        var response = await _heartbeatService.RecordHeartbeatAsync(deviceId, request, publicIp, cancellationToken);
 
         if (response is null)
         {

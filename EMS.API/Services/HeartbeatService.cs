@@ -10,6 +10,7 @@ public class HeartbeatService : IHeartbeatService
     private readonly IHeartbeatRepository _heartbeatRepository;
     private readonly IBlockedWebsiteRepository _blockedWebsiteRepository;
     private readonly INetworkUsageRepository _networkUsageRepository;
+    private readonly IGeoLocationService _geoLocationService;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
@@ -17,17 +18,20 @@ public class HeartbeatService : IHeartbeatService
         IHeartbeatRepository heartbeatRepository,
         IBlockedWebsiteRepository blockedWebsiteRepository,
         INetworkUsageRepository networkUsageRepository,
+        IGeoLocationService geoLocationService,
         ILogger<HeartbeatService> logger)
     {
         _deviceRepository = deviceRepository;
         _heartbeatRepository = heartbeatRepository;
         _blockedWebsiteRepository = blockedWebsiteRepository;
         _networkUsageRepository = networkUsageRepository;
+        _geoLocationService = geoLocationService;
         _logger = logger;
     }
 
     public async Task<HeartbeatResponse?> RecordHeartbeatAsync(
-        string deviceId, HeartbeatRequest request, CancellationToken cancellationToken = default)
+        string deviceId, HeartbeatRequest request, string? publicIpAddress = null,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Heartbeat received from device {DeviceId}.", deviceId);
 
@@ -49,6 +53,8 @@ public class HeartbeatService : IHeartbeatService
 
         // A heartbeat means the device is awake again; clear any sleep marker.
         device.SuspendedAt = null;
+
+        await UpdateLocationAsync(device, publicIpAddress, utcNow, cancellationToken);
 
         var heartbeat = new DeviceHeartbeat
         {
@@ -158,6 +164,43 @@ public class HeartbeatService : IHeartbeatService
             record.BytesSent += sent;
             record.BytesReceived += received;
             record.LastUpdated = utcNow;
+        }
+    }
+
+    /// <summary>
+    /// Records the device's public IP and, when it changes, resolves an
+    /// approximate location from it. Geolocation runs only on an IP change so
+    /// the external lookup happens rarely, and it is best-effort: a failed
+    /// lookup still updates the stored IP.
+    /// </summary>
+    private async Task UpdateLocationAsync(
+        Entities.Device device, string? publicIp, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        if (!GeoLocationService.IsPublicRoutable(publicIp))
+        {
+            return;
+        }
+
+        if (string.Equals(device.PublicIPAddress, publicIp, StringComparison.OrdinalIgnoreCase))
+        {
+            return; // Same network; keep the existing location.
+        }
+
+        device.PublicIPAddress = publicIp;
+
+        var location = await _geoLocationService.ResolveAsync(publicIp, cancellationToken);
+        if (location is not null)
+        {
+            device.LocationCity = location.City;
+            device.LocationRegion = location.Region;
+            device.LocationCountry = location.Country;
+            device.Latitude = location.Latitude;
+            device.Longitude = location.Longitude;
+            device.LocationUpdatedAt = utcNow;
+
+            _logger.LogInformation(
+                "Device {DeviceId} located at {City}, {Country} (via {Ip}).",
+                device.DeviceId, location.City, location.Country, publicIp);
         }
     }
 

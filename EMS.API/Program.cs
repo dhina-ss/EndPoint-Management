@@ -72,6 +72,12 @@ builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventorySer
 builder.Services.AddScoped<IInstallerPackageService, InstallerPackageService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
+
+// City-level geolocation from a device's public IP (free ip-api.com service).
+builder.Services.AddHttpClient<IGeoLocationService, GeoLocationService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 

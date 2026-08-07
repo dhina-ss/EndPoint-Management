@@ -60,4 +60,13 @@ public class DeviceResponse
 
     /// <summary>"Online", "Sleep", or "Offline".</summary>
     public string Status { get; set; } = "Offline";
+
+    // Approximate location resolved from the device's public IP.
+    public string? PublicIPAddress { get; set; }
+    public string? LocationCity { get; set; }
+    public string? LocationRegion { get; set; }
+    public string? LocationCountry { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public DateTime? LocationUpdatedAt { get; set; }
 }
