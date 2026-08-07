@@ -707,3 +707,57 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsAccuracyMeters" double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsCity" text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsCountry" text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsLatitude" double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsLongitude" double precision;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    ALTER TABLE devices ADD "GpsUpdatedAt" timestamp with time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260807183420_AddGpsLocation') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260807183420_AddGpsLocation', '8.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

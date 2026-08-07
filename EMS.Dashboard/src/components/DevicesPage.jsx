@@ -516,9 +516,14 @@ export default function DevicesPage() {
 							{/* Location */}
 							<div className="bg-surface-container-high/40 p-5 rounded-2xl border border-outline-variant/40 space-y-4">
 								<div className="flex items-center justify-between">
-									<SectionTitle icon="location_on" text="Approximate Location" />
-									{inspectDevice.locationLabel && (
-										<span className="px-3 py-1 bg-primary/10 text-primary font-bold text-[11px] rounded-full">{inspectDevice.locationLabel}</span>
+									<SectionTitle icon="location_on" text={inspectDevice.locationSource === 'GPS' ? 'Precise Location' : 'Approximate Location'} />
+									{inspectDevice.locationSource && (
+										<span className={`px-3 py-1 font-bold text-[11px] rounded-full flex items-center gap-1 ${inspectDevice.locationSource === 'GPS' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'}`}>
+											<span className="material-symbols-outlined text-[13px]">{inspectDevice.locationSource === 'GPS' ? 'my_location' : 'public'}</span>
+											{inspectDevice.locationSource === 'GPS'
+												? `GPS${inspectDevice.gpsAccuracyMeters ? ` · ±${Math.round(inspectDevice.gpsAccuracyMeters)}m` : ''}`
+												: 'IP (approx)'}
+										</span>
 									)}
 								</div>
 								{inspectDevice.latitude != null && inspectDevice.longitude != null ? (

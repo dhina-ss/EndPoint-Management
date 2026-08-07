@@ -96,6 +96,8 @@ export function mapDevice(d) {
     longitude: d.longitude,
     locationLabel:
       [d.locationCity, d.locationRegion, d.locationCountry].filter(Boolean).join(', ') || null,
+    locationSource: d.locationSource, // "GPS" | "IP" | null
+    gpsAccuracyMeters: d.gpsAccuracyMeters,
     locationUpdatedAt: d.locationUpdatedAt,
   };
 }

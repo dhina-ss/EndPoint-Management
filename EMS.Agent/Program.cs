@@ -89,6 +89,8 @@ if (args.Contains("--usage-tracker"))
     trackerBuilder.Services.AddHostedService<AppUsageWorker>();
     // Per-user tray icon: green check when activated, red cross when not.
     trackerBuilder.Services.AddHostedService<TrayIconWorker>();
+    // Optional precise GPS location (falls back to the server's IP location).
+    trackerBuilder.Services.AddHostedService<LocationWorker>();
     trackerBuilder.Build().Run();
     return;
 }

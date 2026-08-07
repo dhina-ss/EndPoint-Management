@@ -97,4 +97,19 @@ public class Device
 
     /// <summary>When the location was last resolved (on a public-IP change).</summary>
     public DateTime? LocationUpdatedAt { get; set; }
+
+    // ---- Precise location, reported by the agent from Windows GPS/Wi-Fi ----
+
+    public double? GpsLatitude { get; set; }
+
+    public double? GpsLongitude { get; set; }
+
+    public double? GpsAccuracyMeters { get; set; }
+
+    public string? GpsCity { get; set; }
+
+    public string? GpsCountry { get; set; }
+
+    /// <summary>When the agent last reported a GPS fix.</summary>
+    public DateTime? GpsUpdatedAt { get; set; }
 }
