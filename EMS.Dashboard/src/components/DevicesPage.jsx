@@ -567,12 +567,14 @@ export default function DevicesPage() {
 									<SectionTitle icon="security" text="Antivirus & Threat Protection" />
 									{(() => {
 										const rt = inspectDevice.defenderRealtime;
-										const badge =
-											rt === true
-												? { txt: 'PROTECTED', cls: 'bg-primary/10 text-primary', icon: 'verified_user' }
-												: rt === false
-													? { txt: 'AT RISK', cls: 'bg-error/10 text-error', icon: 'gpp_bad' }
-													: { txt: 'UNKNOWN', cls: 'bg-outline-variant/50 text-on-surface-variant', icon: 'help' };
+										const av = inspectDevice.defenderAntivirus;
+										const known = rt != null || av != null;
+										const active = rt === true && av === true;
+										const badge = !known
+											? { txt: 'UNKNOWN', cls: 'bg-outline-variant/50 text-on-surface-variant', icon: 'help' }
+											: active
+												? { txt: 'ACTIVATED', cls: 'bg-primary/10 text-primary', icon: 'verified_user' }
+												: { txt: 'NOT ACTIVATED', cls: 'bg-error/10 text-error', icon: 'gpp_bad' };
 										return (
 											<span className={`px-3 py-1 font-bold text-[11px] rounded-full flex items-center gap-1 ${badge.cls}`}>
 												<span className="material-symbols-outlined text-[13px]">{badge.icon}</span>{badge.txt}
@@ -583,6 +585,14 @@ export default function DevicesPage() {
 								{inspectDevice.securityStatusUpdatedAt ? (
 									<>
 										<div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[13px]">
+											<Field
+												label="Defender"
+												value={
+													inspectDevice.defenderRealtime === true && inspectDevice.defenderAntivirus === true
+														? 'Activated'
+														: 'Not activated'
+												}
+											/>
 											<Field label="Real-time Protection" value={boolLabel(inspectDevice.defenderRealtime)} />
 											<Field label="Antivirus" value={boolLabel(inspectDevice.defenderAntivirus)} />
 											<Field
