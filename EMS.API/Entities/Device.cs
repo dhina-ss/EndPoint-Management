@@ -112,4 +112,15 @@ public class Device
 
     /// <summary>When the agent last reported a GPS fix.</summary>
     public DateTime? GpsUpdatedAt { get; set; }
+
+    // ---- Microsoft Defender antivirus status (read-only snapshot) ----
+
+    public bool? DefenderRealtimeProtectionEnabled { get; set; }
+    public bool? DefenderAntivirusEnabled { get; set; }
+    public DateTime? DefenderLastQuickScan { get; set; }
+    public DateTime? DefenderLastFullScan { get; set; }
+    public string? DefenderSignatureVersion { get; set; }
+    public int? DefenderSignatureAgeDays { get; set; }
+    public string? DefenderEngineVersion { get; set; }
+    public DateTime? SecurityStatusUpdatedAt { get; set; }
 }

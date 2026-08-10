@@ -63,6 +63,7 @@ builder.Services.AddScoped<IInstallerPackageRepository, InstallerPackageReposito
 builder.Services.AddScoped<IDeviceCommandRepository, DeviceCommandRepository>();
 builder.Services.AddScoped<INetworkUsageRepository, NetworkUsageRepository>();
 builder.Services.AddScoped<IWorkSessionRepository, WorkSessionRepository>();
+builder.Services.AddScoped<IDeviceThreatRepository, DeviceThreatRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
@@ -72,6 +73,7 @@ builder.Services.AddScoped<IApplicationInventoryService, ApplicationInventorySer
 builder.Services.AddScoped<IInstallerPackageService, InstallerPackageService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
+builder.Services.AddScoped<ISecurityStatusService, SecurityStatusService>();
 
 // City-level geolocation from a device's public IP (ip-api.com) and reverse
 // geocoding of GPS fixes (Nominatim, which requires an identifying User-Agent).

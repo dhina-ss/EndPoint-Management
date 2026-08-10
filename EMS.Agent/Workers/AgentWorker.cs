@@ -102,6 +102,9 @@ public class AgentWorker : BackgroundService
                     _lastInstalledAppsReport = DateTime.UtcNow;
                 }
             }
+
+            // Microsoft Defender status + threat history (read-only).
+            await ReportSecurityStatusAsync(apiClient, stoppingToken);
         }
         catch (OperationCanceledException)
         {
@@ -112,6 +115,37 @@ public class AgentWorker : BackgroundService
             _logger.LogError(ex,
                 "Agent cycle failed; the agent keeps running, next attempt in {Interval} minutes.",
                 _apiSettings.PollingIntervalMinutes);
+        }
+    }
+
+    /// <summary>
+    /// Reads Microsoft Defender status + threat history and reports it. Isolated
+    /// so a failure never affects the rest of the cycle; best-effort.
+    /// </summary>
+    private async Task ReportSecurityStatusAsync(IApiClientService apiClient, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var status = await DefenderStatusHelper.ReadAsync(
+                _logger, TimeSpan.FromSeconds(60), stoppingToken);
+            if (status is null)
+            {
+                return; // Defender unavailable (third-party AV, etc.).
+            }
+
+            if (await apiClient.SendSecurityStatusAsync(status, stoppingToken))
+            {
+                _logger.LogInformation(
+                    "Reported Defender status ({ThreatCount} threat(s)).", status.Threats.Count);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Defender status report failed for this cycle.");
         }
     }
 

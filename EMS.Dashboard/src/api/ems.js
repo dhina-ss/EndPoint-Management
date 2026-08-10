@@ -99,6 +99,15 @@ export function mapDevice(d) {
     locationSource: d.locationSource, // "GPS" | "IP" | null
     gpsAccuracyMeters: d.gpsAccuracyMeters,
     locationUpdatedAt: d.locationUpdatedAt,
+    // Microsoft Defender status snapshot (read-only)
+    defenderRealtime: d.defenderRealtimeProtectionEnabled,
+    defenderAntivirus: d.defenderAntivirusEnabled,
+    defenderLastQuickScan: d.defenderLastQuickScan,
+    defenderLastFullScan: d.defenderLastFullScan,
+    defenderSignatureVersion: d.defenderSignatureVersion,
+    defenderSignatureAgeDays: d.defenderSignatureAgeDays,
+    defenderEngineVersion: d.defenderEngineVersion,
+    securityStatusUpdatedAt: d.securityStatusUpdatedAt,
   };
 }
 
@@ -127,6 +136,10 @@ export function fetchNetworkUsage(id, days = 7) {
 
 export function fetchWorkTime(id, days = 7) {
   return getJson(`/api/devices/${encodeURIComponent(id)}/work-time?days=${days}`);
+}
+
+export function fetchThreats(id) {
+  return getJson(`/api/devices/${encodeURIComponent(id)}/threats`);
 }
 
 export function fetchDeviceCommands(id) {

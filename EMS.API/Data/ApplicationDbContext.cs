@@ -32,6 +32,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<WorkSessionRecord> WorkSessionRecords => Set<WorkSessionRecord>();
 
+    public DbSet<DeviceThreat> DeviceThreats => Set<DeviceThreat>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -183,6 +185,22 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(a => a.Device)
                 .WithMany()
                 .HasForeignKey(a => a.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DeviceThreat>(entity =>
+        {
+            entity.ToTable("device_threats");
+
+            entity.HasKey(t => t.Id);
+            entity.HasIndex(t => t.DeviceId);
+
+            entity.Property(t => t.Name).HasMaxLength(400).IsRequired();
+            entity.Property(t => t.Resource).HasMaxLength(1000);
+
+            entity.HasOne(t => t.Device)
+                .WithMany()
+                .HasForeignKey(t => t.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

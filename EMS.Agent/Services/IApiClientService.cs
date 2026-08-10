@@ -25,6 +25,9 @@ public interface IApiClientService
     /// <summary>Sends per-day working-time deltas. Returns false if not registered.</summary>
     Task<bool> SendWorkTimeAsync(IReadOnlyList<WorkTimeModel> sessions, CancellationToken cancellationToken = default);
 
+    /// <summary>Reports the Microsoft Defender status + threat snapshot. Returns false if not registered.</summary>
+    Task<bool> SendSecurityStatusAsync(SecurityStatusModel status, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Best-effort beacon that the device is suspending (for the sleep status).
     /// Fire-and-forget; failures are ignored.

@@ -259,6 +259,42 @@ public class ApiClientService : IApiClientService
         }
     }
 
+    public async Task<bool> SendSecurityStatusAsync(
+        SecurityStatusModel status, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return false;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.SecurityStatusEndpoint)
+            {
+                Content = JsonContent.Create(status)
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            _logger.LogWarning("Security-status report failed with status {StatusCode}.", (int)response.StatusCode);
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Security-status report could not reach the EMS server.");
+            return false;
+        }
+    }
+
     public async Task SendLocationAsync(
         double latitude, double longitude, double accuracyMeters, CancellationToken cancellationToken = default)
     {

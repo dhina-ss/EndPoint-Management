@@ -72,4 +72,14 @@ public class DeviceResponse
     public double? Longitude { get; set; }
     public double? GpsAccuracyMeters { get; set; }
     public DateTime? LocationUpdatedAt { get; set; }
+
+    // Microsoft Defender status snapshot (read-only).
+    public bool? DefenderRealtimeProtectionEnabled { get; set; }
+    public bool? DefenderAntivirusEnabled { get; set; }
+    public DateTime? DefenderLastQuickScan { get; set; }
+    public DateTime? DefenderLastFullScan { get; set; }
+    public string? DefenderSignatureVersion { get; set; }
+    public int? DefenderSignatureAgeDays { get; set; }
+    public string? DefenderEngineVersion { get; set; }
+    public DateTime? SecurityStatusUpdatedAt { get; set; }
 }

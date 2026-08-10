@@ -50,6 +50,9 @@ public class ApiSettings
     /// <summary>Relative path of the installed-applications report endpoint.</summary>
     public string InstalledAppsEndpoint { get; set; } = "/api/devices/installed-apps";
 
+    /// <summary>Relative path of the antivirus (Defender) status report endpoint.</summary>
+    public string SecurityStatusEndpoint { get; set; } = "/api/devices/security-status";
+
     /// <summary>Relative path of the working-time report endpoint.</summary>
     public string WorkTimeEndpoint { get; set; } = "/api/devices/work-time";
 

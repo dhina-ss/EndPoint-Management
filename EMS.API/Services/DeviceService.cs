@@ -238,7 +238,15 @@ public class DeviceService : IDeviceService
             ActivatedByEmail = device.ActivatedByUser?.Email,
             ActivatedAt = device.ActivatedAt,
             PublicIPAddress = device.PublicIPAddress,
-            LocationUpdatedAt = device.LocationUpdatedAt
+            LocationUpdatedAt = device.LocationUpdatedAt,
+            DefenderRealtimeProtectionEnabled = device.DefenderRealtimeProtectionEnabled,
+            DefenderAntivirusEnabled = device.DefenderAntivirusEnabled,
+            DefenderLastQuickScan = device.DefenderLastQuickScan,
+            DefenderLastFullScan = device.DefenderLastFullScan,
+            DefenderSignatureVersion = device.DefenderSignatureVersion,
+            DefenderSignatureAgeDays = device.DefenderSignatureAgeDays,
+            DefenderEngineVersion = device.DefenderEngineVersion,
+            SecurityStatusUpdatedAt = device.SecurityStatusUpdatedAt
         };
 
         // Effective location: prefer a recent GPS fix (precise, VPN-proof);

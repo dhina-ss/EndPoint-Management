@@ -7,6 +7,7 @@ import {
 	fetchAppUsage,
 	fetchNetworkUsage,
 	fetchWorkTime,
+	fetchThreats,
 	fetchDeviceCommands,
 	fetchBlockedWebsites,
 	addBlockedWebsite,
@@ -18,6 +19,8 @@ import {
 	formatBytes,
 	formatHoursMinutes,
 	formatDuration,
+	formatDate,
+	relativeTime,
 } from '../api/ems';
 
 // Status pill colours, three-state (Online / Sleep / Offline).
@@ -90,12 +93,13 @@ export default function DevicesPage() {
 		setNewDomainInput('');
 
 		try {
-			const [metrics, apps, appUsage, network, workTime, commands, blocked] = await Promise.all([
+			const [metrics, apps, appUsage, network, workTime, threats, commands, blocked] = await Promise.all([
 				fetchDeviceMetrics(dev.id).catch(() => null),
 				fetchInstalledApps(dev.id).catch(() => []),
 				fetchAppUsage(dev.id).catch(() => []),
 				fetchNetworkUsage(dev.id, 7).catch(() => []),
 				fetchWorkTime(dev.id, 7).catch(() => []),
+				fetchThreats(dev.id).catch(() => []),
 				fetchDeviceCommands(dev.id).catch(() => []),
 				fetchBlockedWebsites(dev.id).catch(() => []),
 			]);
@@ -130,6 +134,7 @@ export default function DevicesPage() {
 				networkTotal: formatBytes(netReceived + netSent),
 				installedApps: apps,
 				appUsage,
+				threats,
 				commands,
 			};
 			setInspectDevice((cur) => (cur && cur.id === dev.id ? enriched : cur));
@@ -556,6 +561,90 @@ export default function DevicesPage() {
 								)}
 							</div>
 
+							{/* Security / Antivirus (Microsoft Defender) */}
+							<div className="bg-surface-container-high/40 p-5 rounded-2xl border border-outline-variant/40 space-y-4">
+								<div className="flex items-center justify-between">
+									<SectionTitle icon="security" text="Antivirus & Threat Protection" />
+									{(() => {
+										const rt = inspectDevice.defenderRealtime;
+										const badge =
+											rt === true
+												? { txt: 'PROTECTED', cls: 'bg-primary/10 text-primary', icon: 'verified_user' }
+												: rt === false
+													? { txt: 'AT RISK', cls: 'bg-error/10 text-error', icon: 'gpp_bad' }
+													: { txt: 'UNKNOWN', cls: 'bg-outline-variant/50 text-on-surface-variant', icon: 'help' };
+										return (
+											<span className={`px-3 py-1 font-bold text-[11px] rounded-full flex items-center gap-1 ${badge.cls}`}>
+												<span className="material-symbols-outlined text-[13px]">{badge.icon}</span>{badge.txt}
+											</span>
+										);
+									})()}
+								</div>
+								{inspectDevice.securityStatusUpdatedAt ? (
+									<>
+										<div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[13px]">
+											<Field label="Real-time Protection" value={boolLabel(inspectDevice.defenderRealtime)} />
+											<Field label="Antivirus" value={boolLabel(inspectDevice.defenderAntivirus)} />
+											<Field
+												label="Definitions"
+												value={
+													inspectDevice.defenderSignatureVersion
+														? `${inspectDevice.defenderSignatureVersion}${
+																inspectDevice.defenderSignatureAgeDays != null
+																	? ` (${inspectDevice.defenderSignatureAgeDays}d old)`
+																	: ''
+															}`
+														: '—'
+												}
+											/>
+											<Field label="Engine Version" value={inspectDevice.defenderEngineVersion || '—'} mono />
+											<Field label="Last Quick Scan" value={inspectDevice.defenderLastQuickScan ? relativeTime(inspectDevice.defenderLastQuickScan) : 'Never'} />
+											<Field label="Last Full Scan" value={inspectDevice.defenderLastFullScan ? relativeTime(inspectDevice.defenderLastFullScan) : 'Never'} />
+										</div>
+										<div className="pt-2 border-t border-outline-variant/30 space-y-2">
+											<div className="flex items-center justify-between">
+												<span className="text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">Threat History</span>
+												<span className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] ${(inspectDevice.threats ?? []).some((t) => !t.remediated) ? 'bg-error/10 text-error' : 'bg-primary/10 text-primary'}`}>
+													{(inspectDevice.threats ?? []).length} DETECTED
+												</span>
+											</div>
+											<div className="space-y-2 text-[13px] max-h-56 overflow-y-auto pr-1">
+												{(inspectDevice.threats ?? []).length === 0 && (
+													<span className="text-[12px] text-on-surface-variant">No threats recorded by Defender.</span>
+												)}
+												{(inspectDevice.threats ?? []).map((t) => {
+													const sev = severityMeta(t.severity);
+													return (
+														<div key={t.id} className="flex items-start justify-between gap-3 p-2.5 bg-white rounded-xl border border-outline-variant/30">
+															<div className="min-w-0">
+																<span className="font-semibold text-on-surface block truncate">{t.name}</span>
+																<span className="text-[11px] text-on-surface-variant block truncate">
+																	{t.resource || '—'}{t.detectedAt ? ` · ${formatDate(t.detectedAt)}` : ''}
+																</span>
+															</div>
+															<div className="flex items-center gap-1.5 shrink-0">
+																<span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${sev.cls}`}>{sev.label}</span>
+																<span className={`px-2 py-0.5 rounded-md font-medium text-[10px] ${t.remediated ? 'bg-primary/10 text-primary' : 'bg-error/10 text-error'}`}>
+																	{t.remediated ? 'Quarantined' : 'Active'}
+																</span>
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										</div>
+										<p className="text-[11px] text-on-surface-variant">
+											Read-only status from Microsoft Defender · reported {relativeTime(inspectDevice.securityStatusUpdatedAt)}
+										</p>
+									</>
+								) : (
+									<p className="text-[12px] text-on-surface-variant">
+										No Defender status reported yet. The agent reports it on its next cycle after this
+										update reaches the device.
+									</p>
+								)}
+							</div>
+
 							{/* Website filter */}
 							<div className="bg-surface-container-high/40 p-5 rounded-2xl border border-outline-variant/40 space-y-4">
 								<div className="flex items-center justify-between">
@@ -663,6 +752,28 @@ function formatUptime(totalSeconds) {
 	if (days > 0) return `${days}d ${hours}h`;
 	if (hours > 0) return `${hours}h ${minutes}m`;
 	return `${minutes}m`;
+}
+
+function boolLabel(v) {
+	if (v === true) return 'On';
+	if (v === false) return 'Off';
+	return '—';
+}
+
+// Maps a Defender SeverityID to a label + pill classes.
+function severityMeta(sev) {
+	switch (sev) {
+		case 5:
+			return { label: 'SEVERE', cls: 'bg-error/15 text-error' };
+		case 4:
+			return { label: 'HIGH', cls: 'bg-error/10 text-error' };
+		case 2:
+			return { label: 'MODERATE', cls: 'bg-tertiary/15 text-tertiary' };
+		case 1:
+			return { label: 'LOW', cls: 'bg-surface-container-high text-on-surface-variant' };
+		default:
+			return { label: 'UNKNOWN', cls: 'bg-surface-container-high text-on-surface-variant' };
+	}
 }
 
 function SummaryCard({ title, value, icon, tone, badge, sub }) {

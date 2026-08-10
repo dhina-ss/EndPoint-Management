@@ -18,6 +18,7 @@ public class DevicesController : ControllerBase
     private readonly IApplicationInventoryService _applicationService;
     private readonly IDeviceCommandService _commandService;
     private readonly IWorkSessionService _workSessionService;
+    private readonly ISecurityStatusService _securityStatusService;
 
     public DevicesController(
         IDeviceService deviceService,
@@ -26,7 +27,8 @@ public class DevicesController : ControllerBase
         IHeartbeatService heartbeatService,
         IApplicationInventoryService applicationService,
         IDeviceCommandService commandService,
-        IWorkSessionService workSessionService)
+        IWorkSessionService workSessionService,
+        ISecurityStatusService securityStatusService)
     {
         _deviceService = deviceService;
         _appUsageService = appUsageService;
@@ -35,6 +37,7 @@ public class DevicesController : ControllerBase
         _applicationService = applicationService;
         _commandService = commandService;
         _workSessionService = workSessionService;
+        _securityStatusService = securityStatusService;
     }
 
     /// <summary>
@@ -166,6 +169,39 @@ public class DevicesController : ControllerBase
     {
         var apps = await _applicationService.GetInventoryAsync(id, cancellationToken);
         return apps is null ? NotFound() : Ok(apps);
+    }
+
+    // ---- Microsoft Defender security status (read-only) ----
+
+    /// <summary>
+    /// Records the calling device's Microsoft Defender status and replaces its
+    /// threat history with the reported set.
+    /// </summary>
+    [HttpPost("security-status")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ReportSecurityStatus(
+        [FromBody] SecurityStatusReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        var deviceId = Request.Headers[DeviceAuthenticationMiddleware.DeviceIdHeader].ToString();
+        var stored = await _securityStatusService.RecordAsync(deviceId, request, cancellationToken);
+        return stored ? NoContent() : NotFound();
+    }
+
+    /// <summary>Threat history Microsoft Defender has recorded on a device.</summary>
+    [HttpGet("{id:guid}/threats")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(IReadOnlyList<ThreatResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<ThreatResponse>>> GetThreats(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var threats = await _securityStatusService.GetThreatsAsync(id, cancellationToken);
+        return threats is null ? NotFound() : Ok(threats);
     }
 
     // ---- Software management (command queue) ----

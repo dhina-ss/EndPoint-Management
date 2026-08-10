@@ -135,6 +135,27 @@ namespace EMS.API.Data.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool?>("DefenderAntivirusEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DefenderEngineVersion")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DefenderLastFullScan")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DefenderLastQuickScan")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("DefenderRealtimeProtectionEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("DefenderSignatureAgeDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DefenderSignatureVersion")
+                        .HasColumnType("text");
+
                     b.Property<string>("DeviceId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -224,6 +245,9 @@ namespace EMS.API.Data.Migrations
                     b.Property<string>("RamSize")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("SecurityStatusUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SerialNumber")
                         .IsRequired()
@@ -417,6 +441,43 @@ namespace EMS.API.Data.Migrations
                     b.HasIndex("DeviceId", "HeartbeatTime");
 
                     b.ToTable("device_heartbeats", (string)null);
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.DeviceThreat", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DetectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<bool>("Remediated")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Resource")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("Severity")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.ToTable("device_threats", (string)null);
                 });
 
             modelBuilder.Entity("EMS.API.Entities.InstalledApplication", b =>
@@ -618,6 +679,17 @@ namespace EMS.API.Data.Migrations
                 });
 
             modelBuilder.Entity("EMS.API.Entities.DeviceHeartbeat", b =>
+                {
+                    b.HasOne("EMS.API.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("EMS.API.Entities.DeviceThreat", b =>
                 {
                     b.HasOne("EMS.API.Entities.Device", "Device")
                         .WithMany()
