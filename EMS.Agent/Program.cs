@@ -60,6 +60,35 @@ if (args.Contains("--unlock-store"))
     return;
 }
 
+// "Authorize Uninstall" window, launched by the installer's uninstaller. Shows a
+// prompt for EMS admin credentials, verifies them against the server, and exits
+// 0 only when authorized - the uninstaller aborts on any non-zero exit.
+if (args.Contains("--verify-admin"))
+{
+    ConsoleWindowHelper.DetachConsole();
+
+    var verifyBuilder = Host.CreateApplicationBuilder(args);
+    verifyBuilder.Services.AddAgentServices(verifyBuilder.Configuration);
+    verifyBuilder.Services.AddHttpClient<IAdminAuthService, AdminAuthService>((sp, client) =>
+    {
+        var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EMS.Agent.Configuration.ApiSettings>>().Value;
+        if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+        {
+            client.BaseAddress = new Uri(settings.BaseUrl);
+        }
+        client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+    });
+
+    using var verifyHost = verifyBuilder.Build();
+    var authService = verifyHost.Services.GetRequiredService<IAdminAuthService>();
+
+    ApplicationConfiguration.Initialize();
+    var authForm = new UninstallAuthForm(authService);
+    System.Windows.Forms.Application.Run(authForm);
+
+    Environment.Exit(authForm.Authorized ? 0 : 1);
+}
+
 // Foreground-window tracking cannot run inside the Windows Service: services
 // run in Session 0, which has no desktop and cannot see the interactive
 // user's foreground window (that isolation is deliberate, since Windows

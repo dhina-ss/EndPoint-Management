@@ -8,7 +8,7 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.11"
+#define MyAppVersion "1.0.12"
 #define MyAppPublisher "Dhinakaran Sekar"
 #define MyAppExeName "EMS.Agent.exe"
 #define MyServiceName "EMSAgent"
@@ -283,6 +283,46 @@ begin
 
   if CurStep = ssPostInstall then
     RegisterUsageTrackerTask();
+end;
+
+// Uninstall protection: require EMS admin authorization before anything is
+// removed. Runs the installed agent's --verify-admin prompt (which verifies the
+// credentials against the EMS server) and aborts the uninstall unless it exits
+// 0. Guards the normal uninstall paths (Programs & Features, the Start Menu
+// shortcut, running the uninstaller) - not a hardened tamper barrier against a
+// local admin deleting the service by hand.
+function InitializeUninstall(): Boolean;
+var
+  ResultCode: Integer;
+  ExePath: string;
+begin
+  ExePath := ExpandConstant('{app}\{#MyAppExeName}');
+
+  // If the agent exe is already gone, there is nothing to protect.
+  if not FileExists(ExePath) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  if not Exec(ExePath, '--verify-admin', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    MsgBox('Could not launch the EMS authorization prompt. Uninstall cancelled.', mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
+  if ResultCode = 0 then
+  begin
+    Result := True;
+  end
+  else
+  begin
+    MsgBox('EMS Agent can only be uninstalled by an EMS administrator.'#13#10 +
+           'Authorization failed or was cancelled, so the uninstall was stopped.',
+           mbError, MB_OK);
+    Result := False;
+  end;
 end;
 
 // Uninstall path: stop and remove the service and the scheduled task before
