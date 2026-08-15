@@ -18,14 +18,18 @@ export default function Sidebar({ activeTab: externalActiveTab, setActiveTab: ex
     <aside className="fixed left-0 top-0 h-full w-[240px] bg-white border-r border-outline-variant z-50 flex flex-col py-lg">
       <div className="px-md mb-xl">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded flex items-center justify-center text-on-primary shadow-sm">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-              security
-            </span>
-          </div>
+          <svg viewBox="0 0 140 110" className="w-10 h-8 shrink-0" role="img" aria-label="The Lance">
+            <g fill="#06254B">
+              <rect x="6" y="6" width="70" height="22" rx="2" />
+              <rect x="30" y="6" width="22" height="98" rx="2" />
+              <rect x="64" y="28" width="22" height="76" rx="2" />
+              <rect x="64" y="82" width="44" height="22" rx="2" />
+            </g>
+            <polygon points="116,82 138,82 130,104 108,104" fill="#0AB5CE" />
+          </svg>
           <div>
-            <h1 className="font-headline-sm text-headline-sm font-bold text-on-surface">ElixaCloud</h1>
-            <p className="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase">Endpoint Management</p>
+            <h1 className="font-headline-sm text-headline-sm font-bold text-on-surface">The Lance</h1>
+            <p className="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase">The Lance Endpoint</p>
           </div>
         </div>
       </div>

@@ -9,17 +9,20 @@ public class ActivationLoginService : IActivationLoginService
     private readonly HttpClient _httpClient;
     private readonly ApiSettings _settings;
     private readonly IActivationStore _activationStore;
+    private readonly IDeviceIdService _deviceIdService;
     private readonly ILogger<ActivationLoginService> _logger;
 
     public ActivationLoginService(
         HttpClient httpClient,
         IOptions<ApiSettings> settings,
         IActivationStore activationStore,
+        IDeviceIdService deviceIdService,
         ILogger<ActivationLoginService> logger)
     {
         _httpClient = httpClient;
         _settings = settings.Value;
         _activationStore = activationStore;
+        _deviceIdService = deviceIdService;
         _logger = logger;
     }
 
@@ -33,9 +36,13 @@ public class ActivationLoginService : IActivationLoginService
 
         try
         {
+            // Send this endpoint's DeviceId so the server can enforce
+            // one-account-per-device and reject activation on a second machine.
+            var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
             using var response = await _httpClient.PostAsJsonAsync(
                 _settings.LoginEndpoint,
-                new { employeeCode = employeeCode.Trim(), password },
+                new { employeeCode = employeeCode.Trim(), password, deviceId },
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -53,7 +60,7 @@ public class ActivationLoginService : IActivationLoginService
             // Store the employee code (what the user signed in with) so the
             // server can map this device to that user on the next registration.
             _activationStore.Activate(employeeCode.Trim());
-            return new ActivationLoginResult(true, "EMS activated successfully.");
+            return new ActivationLoginResult(true, "The Lance Endpoint activated successfully.");
         }
         catch (HttpRequestException ex)
         {

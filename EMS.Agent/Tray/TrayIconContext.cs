@@ -41,7 +41,7 @@ public sealed class TrayIconContext : ApplicationContext
         {
             Visible = true,
             Icon = _notActivatedIcon,
-            Text = "EMS Agent",
+            Text = "The Lance Endpoint",
             ContextMenuStrip = menu
         };
         // Double-clicking when inactive opens the activation window.
@@ -73,8 +73,8 @@ public sealed class TrayIconContext : ApplicationContext
 
         var who = ActivatedBy();
         _notifyIcon.Text = activated
-            ? Trim($"EMS Agent — Activated{(string.IsNullOrWhiteSpace(who) ? "" : $" ({who})")}")
-            : "EMS Agent — Not activated";
+            ? Trim($"The Lance Endpoint — Activated{(string.IsNullOrWhiteSpace(who) ? "" : $" ({who})")}")
+            : "The Lance Endpoint — Not activated";
 
         _statusItem.Text = activated ? "Status: Activated" : "Status: Not activated";
         _activateItem.Visible = !activated;

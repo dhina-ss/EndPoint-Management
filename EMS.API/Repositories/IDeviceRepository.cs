@@ -6,6 +6,12 @@ public interface IDeviceRepository
 {
     Task<Device?> GetByDeviceIdAsync(string deviceId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The device currently activated by this user, if any. Enforces the
+    /// one-account-per-device rule (a user may hold at most one device).
+    /// </summary>
+    Task<Device?> GetActivatedDeviceForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
     Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Tracked variant of <see cref="GetByIdAsync"/>, for callers that need to mutate and save.</summary>

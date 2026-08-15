@@ -10,15 +10,18 @@ public class AuthService : IAuthService
     private const string InvalidMessage = "Invalid employee code or password.";
 
     private readonly IUserRepository _repository;
+    private readonly IDeviceRepository _deviceRepository;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository repository,
+        IDeviceRepository deviceRepository,
         IPasswordHasher<AppUser> passwordHasher,
         ILogger<AuthService> logger)
     {
         _repository = repository;
+        _deviceRepository = deviceRepository;
         _passwordHasher = passwordHasher;
         _logger = logger;
     }
@@ -38,6 +41,31 @@ public class AuthService : IAuthService
         {
             _logger.LogWarning("Login failed: wrong password for user {Username}.", user.Username);
             return Failed();
+        }
+
+        // One account, one device: if the activating agent sent its DeviceId
+        // and this user is already bound to a different device, refuse — the
+        // account can't be used to activate a second endpoint.
+        if (!string.IsNullOrWhiteSpace(request.DeviceId))
+        {
+            var boundDevice = await _deviceRepository.GetActivatedDeviceForUserAsync(user.Id, cancellationToken);
+            if (boundDevice is not null &&
+                !string.Equals(boundDevice.DeviceId, request.DeviceId.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Activation blocked: user {Username} is already activated on device {BoundDevice}; " +
+                    "rejected new device {NewDevice}.",
+                    user.Username, boundDevice.DeviceId, request.DeviceId);
+
+                return new LoginResponse
+                {
+                    Success = false,
+                    Message =
+                        $"This account is already activated on \"{boundDevice.DeviceName}\". " +
+                        "One account can be used on only one device. " +
+                        "Contact your administrator to release it first."
+                };
+            }
         }
 
         // Transparently upgrade the stored hash if the hasher's parameters

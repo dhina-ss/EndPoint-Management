@@ -207,6 +207,9 @@ public class DeviceCommandServiceTests
         public Task<Device?> GetByDeviceIdAsync(string deviceId, CancellationToken ct = default)
             => Task.FromResult(deviceId == _device.DeviceId ? _device : null);
 
+        public Task<Device?> GetActivatedDeviceForUserAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(_device.ActivatedByUserId == userId ? _device : null);
+
         public Task<Device?> GetTrackedByIdAsync(Guid id, CancellationToken ct = default) => GetByIdAsync(id, ct);
         public Task<IReadOnlyList<Device>> GetAllAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Device>>(new[] { _device });

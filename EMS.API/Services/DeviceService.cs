@@ -178,6 +178,20 @@ public class DeviceService : IDeviceService
             return; // Already mapped to this user.
         }
 
+        // One account, one device (authoritative guard, mirroring the login
+        // check): if this user already holds a different device, don't reassign
+        // them to this one. The login gate should have blocked activation, but
+        // this stops a stale/offline activation from stealing the binding.
+        var boundDevice = await _deviceRepository.GetActivatedDeviceForUserAsync(user.Id, cancellationToken);
+        if (boundDevice is not null && boundDevice.Id != device.Id)
+        {
+            _logger.LogWarning(
+                "Device {DeviceId} reported activation by {Username}, but that user is already bound to " +
+                "device {BoundDevice}. Skipping mapping.",
+                device.DeviceId, user.Username, boundDevice.DeviceId);
+            return;
+        }
+
         device.ActivatedByUserId = user.Id;
         device.ActivatedAt ??= utcNow;
 

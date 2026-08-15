@@ -34,7 +34,7 @@ public class AgentWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "EMS Agent started. Server: {BaseUrl}, polling interval: {Interval} minutes.",
+            "The Lance Endpoint agent started. Server: {BaseUrl}, polling interval: {Interval} minutes.",
             _apiSettings.BaseUrl, _apiSettings.PollingIntervalMinutes);
 
         try
@@ -51,7 +51,7 @@ public class AgentWorker : BackgroundService
         }
         finally
         {
-            _logger.LogInformation("EMS Agent stopped.");
+            _logger.LogInformation("The Lance Endpoint agent stopped.");
         }
     }
 
@@ -68,7 +68,7 @@ public class AgentWorker : BackgroundService
             var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
             if (!activation.IsActivated())
             {
-                _logger.LogInformation("Waiting for activation; sign in via the EMS Agent login to activate.");
+                _logger.LogInformation("Waiting for activation; sign in via The Lance Endpoint login to activate.");
                 return;
             }
 

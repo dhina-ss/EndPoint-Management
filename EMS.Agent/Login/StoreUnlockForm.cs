@@ -23,7 +23,7 @@ public sealed class StoreUnlockForm : Form
     {
         _unlockService = unlockService;
 
-        Text = "EMS Agent — Unlock Microsoft Store";
+        Text = "The Lance Endpoint — Unlock Microsoft Store";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;

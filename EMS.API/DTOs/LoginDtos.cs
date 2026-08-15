@@ -16,6 +16,14 @@ public class LoginRequest
     [Required]
     [MaxLength(128)]
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The activating endpoint's DeviceId. Sent by the agent's activation
+    /// window so the server can enforce one-account-per-device. Omitted by
+    /// admin-authorization flows (e.g. uninstall), which are not device-bound.
+    /// </summary>
+    [MaxLength(100)]
+    public string? DeviceId { get; set; }
 }
 
 /// <summary>Sign-in result. Never carries any password material.</summary>

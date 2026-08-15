@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------
-; EMS Agent - Windows Service installer
+; The Lance Endpoint - Windows Service installer
 ;
 ; Build (from the repository root):
 ;   1. dotnet publish EMS.Agent -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
@@ -7,12 +7,14 @@
 ;   -> installer\output\EMSAgentSetup-<version>.exe
 ; ------------------------------------------------------------------
 
-#define MyAppName "EMS Agent"
-#define MyAppVersion "1.0.13"
-#define MyAppPublisher "Dhinakaran Sekar"
+#define MyAppName "The Lance Endpoint"
+#define MyAppVersion "1.0.14"
+#define MyAppPublisher "The Lance"
 #define MyAppExeName "EMS.Agent.exe"
+; Internal service id kept as "EMSAgent" so upgrades over existing installs
+; still find and manage the running service.
 #define MyServiceName "EMSAgent"
-#define MyServiceDisplayName "EMS Endpoint Agent"
+#define MyServiceDisplayName "The Lance Endpoint Agent"
 #define MyUsageTaskName "EMS App Usage Tracker"
 ; NOTE: the agent targets net8.0-windows10.0.19041.0 (WinForms + GUI subsystem +
 ; WinRT geolocation), so the publish output lives under that exact folder - NOT
@@ -27,6 +29,9 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}
+; Install dir kept as "EMS Agent" - the per-user usage-tracker task
+; (installer\UsageTrackerTask.xml) hardcodes this path, and upgrades over
+; existing installs rely on it.
 DefaultDirName={autopf}\EMS Agent
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -79,14 +84,14 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 ; read-only for the signed-in user. S-1-5-32-545 = the built-in Users group.
 Filename: "{sys}\icacls.exe"; Parameters: """{commonappdata}\EMS.Agent"" /grant *S-1-5-32-545:(OI)(CI)M /T /C /Q"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "create {#MyServiceName} binPath= ""{app}\{#MyAppExeName}"" start= auto DisplayName= ""{#MyServiceDisplayName}"""; Flags: runhidden
-Filename: "{sys}\sc.exe"; Parameters: "description {#MyServiceName} ""Collects device inventory and heartbeat data for the Endpoint Management System."""; Flags: runhidden
+Filename: "{sys}\sc.exe"; Parameters: "description {#MyServiceName} ""Collects device inventory and heartbeat data for The Lance Endpoint."""; Flags: runhidden
 ; Restart automatically if the service ever crashes (3 restarts, 1 min apart, reset counter daily).
 Filename: "{sys}\sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden
 ; Open the activation login window immediately after install. postinstall +
 ; nowait so setup finishes; skipifsilent so unattended installs are not
 ; blocked waiting on a person. The service stays dormant until this sign-in.
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"; Description: "Activate EMS Agent (sign in)"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"; Description: "Activate The Lance Endpoint (sign in)"; Flags: postinstall nowait skipifsilent
 
 [Code]
 // Application usage (foreground-window) tracking cannot run inside the
@@ -318,7 +323,7 @@ begin
   end
   else
   begin
-    MsgBox('EMS Agent can only be uninstalled by an EMS administrator.'#13#10 +
+    MsgBox('The Lance Endpoint can only be uninstalled by an administrator.'#13#10 +
            'Authorization failed or was cancelled, so the uninstall was stopped.',
            mbError, MB_OK);
     Result := False;

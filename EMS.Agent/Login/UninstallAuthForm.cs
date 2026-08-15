@@ -25,7 +25,7 @@ public sealed class UninstallAuthForm : Form
     {
         _authService = authService;
 
-        Text = "EMS Agent — Authorize Uninstall";
+        Text = "The Lance Endpoint — Authorize Uninstall";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
@@ -43,7 +43,7 @@ public sealed class UninstallAuthForm : Form
 
         var subheading = new Label
         {
-            Text = "Uninstalling EMS Agent requires EMS admin credentials.",
+            Text = "Uninstalling The Lance Endpoint requires admin credentials.",
             ForeColor = SystemColors.GrayText,
             AutoSize = true,
             Location = new Point(20, 46),

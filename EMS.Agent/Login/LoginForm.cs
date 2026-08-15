@@ -23,7 +23,7 @@ public sealed class LoginForm : Form
     {
         _loginService = loginService;
 
-        Text = "EMS Agent — Activation";
+        Text = "The Lance Endpoint — Activation";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
@@ -91,8 +91,8 @@ public sealed class LoginForm : Form
                 _statusLabel.ForeColor = Color.Green;
                 _statusLabel.Text = result.Message;
                 MessageBox.Show(
-                    result.Message + "\n\nThe EMS Agent is now active on this device.",
-                    "EMS Activated",
+                    result.Message + "\n\nThe Lance Endpoint is now active on this device.",
+                    "The Lance Endpoint — Activated",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 Close();

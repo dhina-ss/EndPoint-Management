@@ -101,6 +101,8 @@ public class WorkSessionServiceTests
 
         public Task<Device?> GetByDeviceIdAsync(string deviceId, CancellationToken ct = default)
             => Task.FromResult(deviceId == Device.DeviceId ? Device : null);
+        public Task<Device?> GetActivatedDeviceForUserAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Device.ActivatedByUserId == userId ? Device : null);
         public Task<Device?> GetByIdAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult(id == Device.Id ? Device : null);
         public Task<Device?> GetTrackedByIdAsync(Guid id, CancellationToken ct = default) => GetByIdAsync(id, ct);

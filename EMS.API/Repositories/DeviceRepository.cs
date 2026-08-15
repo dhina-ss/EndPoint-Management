@@ -19,6 +19,14 @@ public class DeviceRepository : IDeviceRepository
             .FirstOrDefaultAsync(d => d.DeviceId == deviceId, cancellationToken);
     }
 
+    public async Task<Device?> GetActivatedDeviceForUserAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Devices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.ActivatedByUserId == userId, cancellationToken);
+    }
+
     public async Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Devices
