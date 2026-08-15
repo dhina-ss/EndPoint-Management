@@ -73,6 +73,25 @@ public static class SystemInfoHelper
         return (null, null, null);
     }
 
+    /// <summary>
+    /// A stable identifier for the current power-on session: the OS last-boot
+    /// time to the second. Changes only on a real shutdown/restart (not sleep
+    /// or logoff), so it keys "require sign-in on every startup". Returns null
+    /// if the boot time can't be read.
+    /// </summary>
+    public static string? GetBootId()
+    {
+        try
+        {
+            var (_, _, lastBoot) = GetOperatingSystemInfo();
+            return lastBoot?.ToUniversalTime().ToString("yyyyMMddHHmmss");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>Total capacity of all fixed (local) disks.</summary>
     public static ulong GetTotalFixedDiskBytes()
     {

@@ -61,9 +61,10 @@ public class LocationWorker : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
 
-            // Only report once the device is activated (same gate as the rest).
-            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
-            if (!activation.IsActivated())
+            // Only report once monitoring is active for this session (same gate
+            // as the rest, including require-login-each-startup).
+            var gate = scope.ServiceProvider.GetRequiredService<IActivationGate>();
+            if (!gate.IsMonitoringActive())
             {
                 return;
             }

@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# EMS: built agent installers - distribute via GitHub Releases, not git
+# (27MB+ each; committing every version bloated .git to >1GB and broke CI clones)
+installer/output/

@@ -120,6 +120,25 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
+    /// Sets whether the agent requires the user to sign in on every device
+    /// startup (Enabled=true) or stays activated after a one-time sign-in
+    /// (Enabled=false). Takes effect on the device's next heartbeat.
+    /// </summary>
+    [HttpPut("{id:guid}/login-policy")]
+    [RequireDeviceAuth]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(DeviceAuthResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DeviceResponse>> SetLoginPolicy(
+        Guid id,
+        [FromBody] UsbBlockingUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var device = await _deviceService.SetLoginPolicyAsync(id, request.Enabled, cancellationToken);
+        return device is null ? NotFound() : Ok(device);
+    }
+
+    /// <summary>
     /// Returns per-application foreground-usage totals for a device on a
     /// given day (defaults to today, UTC).
     /// </summary>

@@ -150,6 +150,25 @@ public class DeviceService : IDeviceService
         return MapToResponse(device);
     }
 
+    public async Task<DeviceResponse?> SetLoginPolicyAsync(
+        Guid id, bool requireLoginEachStartup, CancellationToken cancellationToken = default)
+    {
+        var device = await _deviceRepository.GetTrackedByIdAsync(id, cancellationToken);
+        if (device is null)
+        {
+            return null;
+        }
+
+        device.RequireLoginEachStartup = requireLoginEachStartup;
+        await _deviceRepository.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Require-login-each-startup set to {Enabled} for device {DeviceId}.",
+            requireLoginEachStartup, device.DeviceId);
+
+        return MapToResponse(device);
+    }
+
     /// <summary>
     /// Links the device to the EMS user that activated it (by the employee code
     /// the agent reports from its local activation state). The password was
@@ -246,6 +265,7 @@ public class DeviceService : IDeviceService
             LastHeartbeatTime = device.LastHeartbeatTime,
             UsbBlockingEnabled = device.UsbBlockingEnabled,
             StoreGatingEnabled = device.StoreGatingEnabled,
+            RequireLoginEachStartup = device.RequireLoginEachStartup,
             ActivatedByUserId = device.ActivatedByUserId,
             ActivatedByEmployeeCode = device.ActivatedByUser?.EmployeeCode,
             ActivatedByName = device.ActivatedByUser?.Username,

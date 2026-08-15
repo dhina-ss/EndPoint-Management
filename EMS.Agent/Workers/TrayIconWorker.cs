@@ -14,11 +14,13 @@ namespace EMS.Agent.Workers;
 public class TrayIconWorker : BackgroundService
 {
     private readonly IActivationStore _activation;
+    private readonly IActivationGate _gate;
     private readonly ILogger<TrayIconWorker> _logger;
 
-    public TrayIconWorker(IActivationStore activation, ILogger<TrayIconWorker> logger)
+    public TrayIconWorker(IActivationStore activation, IActivationGate gate, ILogger<TrayIconWorker> logger)
     {
         _activation = activation;
+        _gate = gate;
         _logger = logger;
     }
 
@@ -48,7 +50,7 @@ public class TrayIconWorker : BackgroundService
     {
         try
         {
-            using var context = new TrayIconContext(_activation);
+            using var context = new TrayIconContext(_activation, _gate);
             System.Windows.Forms.Application.Run(context);
         }
         catch (Exception ex)

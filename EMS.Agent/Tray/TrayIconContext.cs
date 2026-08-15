@@ -16,6 +16,7 @@ namespace EMS.Agent.Tray;
 public sealed class TrayIconContext : ApplicationContext
 {
     private readonly IActivationStore _activation;
+    private readonly IActivationGate _gate;
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly Icon _activatedIcon = TrayIcons.Activated();
@@ -23,10 +24,12 @@ public sealed class TrayIconContext : ApplicationContext
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _activateItem;
     private bool? _lastActivated;
+    private Process? _loginProcess;
 
-    public TrayIconContext(IActivationStore activation)
+    public TrayIconContext(IActivationStore activation, IActivationGate gate)
     {
         _activation = activation;
+        _gate = gate;
 
         _statusItem = new ToolStripMenuItem { Enabled = false };
         _activateItem = new ToolStripMenuItem("Activate EMS…");
@@ -62,6 +65,14 @@ public sealed class TrayIconContext : ApplicationContext
 
     private void Refresh()
     {
+        // Require-sign-in-each-startup: when this boot hasn't signed in yet,
+        // pop the login window. Re-prompt only after a previous prompt was
+        // closed (don't spawn a new window every tick).
+        if (NeedsSessionLogin() && (_loginProcess is null || _loginProcess.HasExited))
+        {
+            _loginProcess = LaunchActivation();
+        }
+
         var activated = IsActivated();
         if (_lastActivated == activated)
         {
@@ -82,7 +93,13 @@ public sealed class TrayIconContext : ApplicationContext
 
     private bool IsActivated()
     {
-        try { return _activation.IsActivated(); }
+        try { return _gate.IsMonitoringActive(); }
+        catch { return false; }
+    }
+
+    private bool NeedsSessionLogin()
+    {
+        try { return _gate.NeedsSessionLogin(); }
         catch { return false; }
     }
 
@@ -92,20 +109,22 @@ public sealed class TrayIconContext : ApplicationContext
         catch { return null; }
     }
 
-    private static void LaunchActivation()
+    private static Process? LaunchActivation()
     {
         try
         {
             var exe = Environment.ProcessPath;
             if (!string.IsNullOrEmpty(exe))
             {
-                Process.Start(new ProcessStartInfo(exe, "--login") { UseShellExecute = false });
+                return Process.Start(new ProcessStartInfo(exe, "--login") { UseShellExecute = false });
             }
         }
         catch
         {
             // Best-effort; the Start Menu shortcut is the fallback.
         }
+
+        return null;
     }
 
     // NotifyIcon.Text is limited to 63 characters.

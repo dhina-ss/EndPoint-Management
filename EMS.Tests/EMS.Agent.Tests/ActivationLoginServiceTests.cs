@@ -26,7 +26,13 @@ public class ActivationLoginServiceTests
         });
 
         return new ActivationLoginService(
-            httpClient, settings, _store, NullLogger<ActivationLoginService>.Instance);
+            httpClient, settings, _store, new FixedDeviceIdService(), NullLogger<ActivationLoginService>.Instance);
+    }
+
+    private sealed class FixedDeviceIdService : IDeviceIdService
+    {
+        public Task<string> GetDeviceIdAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult("TEST-DEVICE-ID");
     }
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body)
@@ -86,6 +92,7 @@ public class ActivationLoginServiceTests
 
         public bool IsActivated() => Activated;
         public string? ActivatedBy() => ActivatedByUser;
+        public string? SessionBootId() => null;
 
         public void Activate(string activatedBy)
         {

@@ -18,6 +18,9 @@ public class DeviceMetricsResponse
     /// <summary>"Online", "Sleep", or "Offline".</summary>
     public string Status { get; set; } = "Offline";
 
+    /// <summary>Version of the installed agent, from the latest heartbeat.</summary>
+    public string? AgentVersion { get; set; }
+
     public double? CpuUsagePercent { get; set; }
 
     public double? MemoryUsagePercent { get; set; }

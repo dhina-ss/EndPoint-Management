@@ -8,7 +8,7 @@
 ; ------------------------------------------------------------------
 
 #define MyAppName "The Lance Endpoint"
-#define MyAppVersion "1.0.14"
+#define MyAppVersion "1.0.15"
 #define MyAppPublisher "The Lance"
 #define MyAppExeName "EMS.Agent.exe"
 ; Internal service id kept as "EMSAgent" so upgrades over existing installs

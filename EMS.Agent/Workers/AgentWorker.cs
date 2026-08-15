@@ -64,11 +64,13 @@ public class AgentWorker : BackgroundService
             using var scope = _scopeFactory.CreateScope();
 
             // Activation gate: until an EMS user signs in on this device, the
-            // agent registers/collects/reports nothing.
-            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
-            if (!activation.IsActivated())
+            // agent registers/collects/reports nothing. Under the require-login-
+            // each-startup policy this also pauses until the user signs in for
+            // the current power-on session.
+            var gate = scope.ServiceProvider.GetRequiredService<IActivationGate>();
+            if (!gate.IsMonitoringActive())
             {
-                _logger.LogInformation("Waiting for activation; sign in via The Lance Endpoint login to activate.");
+                _logger.LogInformation("Waiting for sign-in; The Lance Endpoint is dormant until a user activates this session.");
                 return;
             }
 

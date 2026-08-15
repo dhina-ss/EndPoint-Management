@@ -78,6 +78,8 @@ export function mapDevice(d) {
     user: d.activatedByEmail || d.username || '—',
     userRole: d.activatedByName ? 'Assigned User' : 'Unassigned',
     empCode: d.activatedByEmployeeCode,
+    activated: !!(d.activatedAt || d.activatedByUserId),
+    requireLoginEachStartup: !!d.requireLoginEachStartup,
     ip: d.ipAddress || '—',
     mac: d.macAddress || '—',
     status: d.status || 'Offline',
@@ -176,6 +178,16 @@ export async function removeBlockedWebsite(id, blockId) {
 
 export async function setUsbBlocking(id, enabled) {
   const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/usb-blocking`, {
+    method: 'PUT',
+    headers: jsonHeaders,
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throwForStatus(res.status);
+  return mapDevice(await res.json());
+}
+
+export async function setLoginPolicy(id, enabled) {
+  const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/login-policy`, {
     method: 'PUT',
     headers: jsonHeaders,
     body: JSON.stringify({ enabled }),

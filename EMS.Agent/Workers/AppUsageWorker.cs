@@ -18,6 +18,7 @@ public class AppUsageWorker : BackgroundService
     private readonly IAppUsageTrackerService _tracker;
     private readonly IWorkTimeTracker _workTimeTracker;
     private readonly ISessionStateService _sessionState;
+    private readonly IActivationGate _gate;
     private readonly ApiSettings _apiSettings;
     private readonly ILogger<AppUsageWorker> _logger;
 
@@ -26,6 +27,7 @@ public class AppUsageWorker : BackgroundService
         IAppUsageTrackerService tracker,
         IWorkTimeTracker workTimeTracker,
         ISessionStateService sessionState,
+        IActivationGate gate,
         IOptions<ApiSettings> apiSettings,
         ILogger<AppUsageWorker> logger)
     {
@@ -33,6 +35,7 @@ public class AppUsageWorker : BackgroundService
         _tracker = tracker;
         _workTimeTracker = workTimeTracker;
         _sessionState = sessionState;
+        _gate = gate;
         _apiSettings = apiSettings.Value;
         _logger = logger;
     }
@@ -57,6 +60,13 @@ public class AppUsageWorker : BackgroundService
             {
                 await Task.Delay(sampleInterval, stoppingToken);
 
+                // Pause sampling while monitoring is inactive (not enrolled, or
+                // require-login-each-startup and this session hasn't signed in).
+                if (!MonitoringActive())
+                {
+                    continue;
+                }
+
                 Sample(sampleInterval);
                 elapsedSinceUpload += sampleInterval;
 
@@ -78,6 +88,13 @@ public class AppUsageWorker : BackgroundService
             _sessionState.Suspending -= OnSuspending;
             _logger.LogInformation("App usage worker stopped.");
         }
+    }
+
+    /// <summary>Fail-open: a transient gate error must not drop usage tracking.</summary>
+    private bool MonitoringActive()
+    {
+        try { return _gate.IsMonitoringActive(); }
+        catch { return true; }
     }
 
     private void OnSuspending()

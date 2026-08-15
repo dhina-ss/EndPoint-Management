@@ -246,6 +246,9 @@ namespace EMS.API.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<bool>("RequireLoginEachStartup")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("SecurityStatusUpdatedAt")
                         .HasColumnType("timestamp with time zone");
 

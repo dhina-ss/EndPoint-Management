@@ -72,8 +72,9 @@ public sealed record HeartbeatOutcome(
     bool Success,
     bool UsbBlockingEnabled,
     bool StoreGatingEnabled,
-    IReadOnlyList<string> BlockedWebsites)
+    IReadOnlyList<string> BlockedWebsites,
+    bool RequireLoginEachStartup)
 {
     public static readonly HeartbeatOutcome Failed =
-        new(false, false, false, Array.Empty<string>());
+        new(false, false, false, Array.Empty<string>(), false);
 }

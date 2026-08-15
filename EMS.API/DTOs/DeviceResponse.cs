@@ -47,6 +47,9 @@ public class DeviceResponse
 
     public bool StoreGatingEnabled { get; set; }
 
+    /// <summary>When true, the agent asks the user to sign in on every startup.</summary>
+    public bool RequireLoginEachStartup { get; set; }
+
     // The EMS user who activated the device (null until activated).
     public Guid? ActivatedByUserId { get; set; }
 

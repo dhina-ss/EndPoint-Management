@@ -23,6 +23,12 @@ public class HeartbeatResponse
     public bool StoreGatingEnabled { get; set; }
 
     /// <summary>
+    /// When true, the agent requires the user to sign in on each device
+    /// startup; the agent applies it after this heartbeat.
+    /// </summary>
+    public bool RequireLoginEachStartup { get; set; }
+
+    /// <summary>
     /// Device-specific domains to block, on top of the agent's always-on
     /// default phishing/malware list. The agent merges the two and writes
     /// them to the hosts file after each heartbeat.

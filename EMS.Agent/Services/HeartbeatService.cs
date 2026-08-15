@@ -17,17 +17,20 @@ public class HeartbeatService : IHeartbeatService
     private readonly IApiClientService _apiClient;
     private readonly ISystemMetricsService _metricsService;
     private readonly IStoreUnlockStore _storeUnlockStore;
+    private readonly ILoginPolicyStore _loginPolicyStore;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
         IApiClientService apiClient,
         ISystemMetricsService metricsService,
         IStoreUnlockStore storeUnlockStore,
+        ILoginPolicyStore loginPolicyStore,
         ILogger<HeartbeatService> logger)
     {
         _apiClient = apiClient;
         _metricsService = metricsService;
         _storeUnlockStore = storeUnlockStore;
+        _loginPolicyStore = loginPolicyStore;
         _logger = logger;
     }
 
@@ -48,6 +51,10 @@ public class HeartbeatService : IHeartbeatService
             HostsFileHelper.ApplyBlocklist(domainsToBlock, _logger);
 
             ApplyStorePolicy(outcome.StoreGatingEnabled);
+
+            // Persist the sign-in policy so the per-user tracker/login window
+            // (separate processes) can act on it at the next startup.
+            _loginPolicyStore.Set(outcome.RequireLoginEachStartup);
         }
 
         return outcome.Success;

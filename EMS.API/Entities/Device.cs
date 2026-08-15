@@ -60,6 +60,13 @@ public class Device
     /// </summary>
     public bool StoreGatingEnabled { get; set; }
 
+    /// <summary>
+    /// When true, the agent requires the user to sign in on every device
+    /// startup (per boot), rather than staying activated after a one-time
+    /// sign-in. Applied by the agent on the next heartbeat.
+    /// </summary>
+    public bool RequireLoginEachStartup { get; set; }
+
     /// <summary>The device's API credential; created at first registration.</summary>
     public DeviceAuthentication? Authentication { get; set; }
 

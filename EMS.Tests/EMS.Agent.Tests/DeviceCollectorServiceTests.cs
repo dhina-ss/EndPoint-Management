@@ -67,6 +67,7 @@ public class DeviceCollectorServiceTests
 
         public bool IsActivated() => true;
         public string? ActivatedBy() => _activatedBy;
+        public string? SessionBootId() => null;
         public void Activate(string activatedBy) { }
     }
 }

@@ -19,6 +19,12 @@ public static class ServiceCollectionExtensions
         // Activation gate: the service reads it; the login window writes it.
         services.AddSingleton<IActivationStore, ActivationStore>();
 
+        // "Require sign-in on every startup" policy: the service writes it from
+        // each heartbeat; the tracker/login read it. The gate combines it with
+        // enrollment + boot id to decide whether monitoring is active.
+        services.AddSingleton<ILoginPolicyStore, LoginPolicyStore>();
+        services.AddSingleton<IActivationGate, ActivationGate>();
+
         // Microsoft Store unlock state: the service reads it; the unlock
         // window writes it after verifying the admin password.
         services.AddSingleton<IStoreUnlockStore, StoreUnlockStore>();

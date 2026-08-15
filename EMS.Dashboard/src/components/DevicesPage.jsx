@@ -13,6 +13,7 @@ import {
 	addBlockedWebsite,
 	removeBlockedWebsite,
 	setUsbBlocking,
+	setLoginPolicy,
 	uninstallApp,
 	uploadPackage,
 	queueInstall,
@@ -46,6 +47,7 @@ export default function DevicesPage() {
 
 	// Device-detail live state
 	const [usbBlockingEnabled, setUsbBlockingEnabled] = useState(false);
+	const [loginEachStartup, setLoginEachStartup] = useState(false);
 	const [blockedDomains, setBlockedDomains] = useState([]); // [{id, domain}]
 	const [newDomainInput, setNewDomainInput] = useState('');
 	const pushFileRef = useRef(null);
@@ -89,6 +91,7 @@ export default function DevicesPage() {
 		setInspectDevice(dev);
 		setDetailError(null);
 		setUsbBlockingEnabled(!!dev.usbBlocking);
+		setLoginEachStartup(!!dev.requireLoginEachStartup);
 		setBlockedDomains([]);
 		setNewDomainInput('');
 
@@ -113,6 +116,7 @@ export default function DevicesPage() {
 			const enriched = {
 				...dev,
 				status: metrics?.status ?? dev.status,
+				agentVersion: metrics?.agentVersion ?? null,
 				cpuUsage: metrics?.cpuUsagePercent != null ? `${metrics.cpuUsagePercent.toFixed(0)}%` : '—',
 				cpuPercent: metrics?.cpuUsagePercent ?? 0,
 				ramUsage:
@@ -158,6 +162,22 @@ export default function DevicesPage() {
 		} catch (err) {
 			setUsbBlockingEnabled(!next);
 			notify(err instanceof Error ? err.message : 'Failed to update USB blocking.');
+		}
+	};
+
+	const handleToggleLoginPolicy = async () => {
+		if (!inspectDevice) return;
+		const next = !loginEachStartup;
+		setLoginEachStartup(next);
+		try {
+			await setLoginPolicy(inspectDevice.id, next);
+			setDevices((ds) =>
+				ds.map((d) => (d.id === inspectDevice.id ? { ...d, requireLoginEachStartup: next } : d)),
+			);
+			setInspectDevice((cur) => (cur ? { ...cur, requireLoginEachStartup: next } : cur));
+		} catch (err) {
+			setLoginEachStartup(!next);
+			notify(err instanceof Error ? err.message : 'Failed to update the login policy.');
 		}
 	};
 
@@ -433,6 +453,48 @@ export default function DevicesPage() {
 									<Field label="Employee Code" value={inspectDevice.empCode || '—'} mono />
 									<Field label="Activated On" value={inspectDevice.activatedOn} />
 									<Field label="Email" value={inspectDevice.user} />
+								</div>
+							</div>
+
+							{/* Management agent (The Lance Endpoint) status */}
+							<div className="bg-surface-container-high/40 p-5 rounded-2xl border border-outline-variant/40 space-y-4">
+								<div className="flex items-center justify-between">
+									<SectionTitle icon="shield_person" text="Management Agent" />
+									{(() => {
+										const a = agentStatusMeta(inspectDevice);
+										return (
+											<span className={`px-3 py-1 font-bold text-[11px] rounded-full flex items-center gap-1 ${a.cls}`}>
+												<span className="material-symbols-outlined text-[13px]">{a.icon}</span>{a.label}
+											</span>
+										);
+									})()}
+								</div>
+								<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[13px]">
+									<Field label="Software" value="The Lance Endpoint" />
+									<Field label="Agent Version" value={inspectDevice.agentVersion || '—'} mono />
+									<Field label="Activated On" value={inspectDevice.activatedOn} />
+									<Field label="Registered" value={inspectDevice.registrationDate} />
+									<Field label="Last Check-in" value={inspectDevice.lastSync} />
+								</div>
+								<p className="text-[11px] text-on-surface-variant">{agentStatusMeta(inspectDevice).note}</p>
+
+								<div className="p-4 bg-white rounded-2xl border border-outline-variant/30 flex items-center justify-between">
+									<div className="flex items-center gap-3">
+										<div className={`w-10 h-10 rounded-xl flex items-center justify-center ${loginEachStartup ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
+											<span className="material-symbols-outlined">{loginEachStartup ? 'lock_clock' : 'how_to_reg'}</span>
+										</div>
+										<div>
+											<span className="font-semibold text-on-surface text-[14px] block">Require sign-in every startup</span>
+											<span className="text-[11px] text-on-surface-variant">
+												{loginEachStartup
+													? 'User must sign in each time the device is turned on.'
+													: 'One-time: stays activated after the first sign-in.'} Applies on the next heartbeat.
+											</span>
+										</div>
+									</div>
+									<button type="button" onClick={handleToggleLoginPolicy} className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${loginEachStartup ? 'bg-primary' : 'bg-outline-variant'}`}>
+										<span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition ${loginEachStartup ? 'translate-x-5' : 'translate-x-0'}`} />
+									</button>
 								</div>
 							</div>
 
@@ -762,6 +824,35 @@ function formatUptime(totalSeconds) {
 	if (days > 0) return `${days}d ${hours}h`;
 	if (hours > 0) return `${hours}h ${minutes}m`;
 	return `${minutes}m`;
+}
+
+// Derives the management-agent (The Lance Endpoint) install status from the
+// device's activation + live status. A device only exists here because its
+// agent registered at least once, so "installed" is implied; the states
+// distinguish active vs. silent vs. never-signed-in.
+function agentStatusMeta(dev) {
+	if (!dev.activated) {
+		return {
+			label: 'NOT ACTIVATED',
+			cls: 'bg-outline-variant/50 text-on-surface-variant',
+			icon: 'person_off',
+			note: 'Installed on this device, but no user has signed in to activate it yet.',
+		};
+	}
+	if (dev.status === 'Online' || dev.status === 'Sleep') {
+		return {
+			label: 'ACTIVE',
+			cls: 'bg-primary/10 text-primary',
+			icon: 'verified_user',
+			note: 'The Lance Endpoint is installed, activated, and reporting.',
+		};
+	}
+	return {
+		label: 'NOT REPORTING',
+		cls: 'bg-tertiary/15 text-tertiary',
+		icon: 'cloud_off',
+		note: 'No recent check-in. The device may be powered off, offline, or the agent removed.',
+	};
 }
 
 function boolLabel(v) {

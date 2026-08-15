@@ -31,6 +31,8 @@ public class ActivationStore : IActivationStore
 
     public string? ActivatedBy() => ReadDocument()?.ActivatedBy;
 
+    public string? SessionBootId() => ReadDocument()?.SessionBootId;
+
     public void Activate(string activatedBy)
     {
         try
@@ -40,7 +42,10 @@ public class ActivationStore : IActivationStore
             var document = new ActivationDocument
             {
                 ActivatedBy = activatedBy,
-                ActivatedAt = DateTime.UtcNow
+                ActivatedAt = DateTime.UtcNow,
+                // Stamp the current power-on session so the require-login-each-
+                // startup policy can tell this boot from the next one.
+                SessionBootId = SystemInfoHelper.GetBootId()
             };
 
             UserWritableFile.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
@@ -80,5 +85,7 @@ public class ActivationStore : IActivationStore
         public string? ActivatedBy { get; set; }
 
         public DateTime ActivatedAt { get; set; }
+
+        public string? SessionBootId { get; set; }
     }
 }

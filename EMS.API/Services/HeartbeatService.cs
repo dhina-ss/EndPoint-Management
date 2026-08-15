@@ -85,6 +85,7 @@ public class HeartbeatService : IHeartbeatService
             ServerTime = utcNow,
             UsbBlockingEnabled = device.UsbBlockingEnabled,
             StoreGatingEnabled = device.StoreGatingEnabled,
+            RequireLoginEachStartup = device.RequireLoginEachStartup,
             BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
         };
     }
@@ -113,6 +114,7 @@ public class HeartbeatService : IHeartbeatService
             CollectedAt = latest.HeartbeatTime,
             IsOnline = isOnline,
             Status = status,
+            AgentVersion = latest.AgentVersion,
             CpuUsagePercent = latest.CpuUsagePercent,
             MemoryUsagePercent = latest.MemoryUsagePercent,
             MemoryUsedMb = latest.MemoryUsedMb,
