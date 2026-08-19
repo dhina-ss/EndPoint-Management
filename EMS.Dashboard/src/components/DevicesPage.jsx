@@ -24,6 +24,16 @@ import {
 	relativeTime,
 } from '../api/ems';
 
+// USB-block durations offered when enabling. minutes 0 = permanent.
+const USB_DURATIONS = [
+	{ label: '1 hour', minutes: 60 },
+	{ label: '5 hours', minutes: 300 },
+	{ label: '1 day', minutes: 1440 },
+	{ label: '1 week', minutes: 10080 },
+	{ label: '1 month', minutes: 43200 },
+	{ label: 'Permanent', minutes: 0 },
+];
+
 // Status pill colours, three-state (Online / Sleep / Offline).
 function statusClasses(status) {
 	if (status === 'Online') return { pill: 'bg-primary/10 text-primary', dot: 'bg-primary' };
@@ -47,6 +57,8 @@ export default function DevicesPage() {
 
 	// Device-detail live state
 	const [usbBlockingEnabled, setUsbBlockingEnabled] = useState(false);
+	const [usbBlockingUntil, setUsbBlockingUntil] = useState(null);
+	const [usbDuration, setUsbDuration] = useState(60); // minutes; 0 = permanent
 	const [loginEachStartup, setLoginEachStartup] = useState(false);
 	const [blockedDomains, setBlockedDomains] = useState([]); // [{id, domain}]
 	const [newDomainInput, setNewDomainInput] = useState('');
@@ -91,6 +103,7 @@ export default function DevicesPage() {
 		setInspectDevice(dev);
 		setDetailError(null);
 		setUsbBlockingEnabled(!!dev.usbBlocking);
+		setUsbBlockingUntil(dev.usbBlockingUntil ?? null);
 		setLoginEachStartup(!!dev.requireLoginEachStartup);
 		setBlockedDomains([]);
 		setNewDomainInput('');
@@ -152,15 +165,22 @@ export default function DevicesPage() {
 		setTimeout(() => setActionMsg(null), 4000);
 	};
 
-	const handleToggleUsb = async () => {
+	const handleSetUsb = async (enabled, durationMinutes = null) => {
 		if (!inspectDevice) return;
-		const next = !usbBlockingEnabled;
-		setUsbBlockingEnabled(next);
+		const prevEnabled = usbBlockingEnabled;
+		const prevUntil = usbBlockingUntil;
+		setUsbBlockingEnabled(enabled);
 		try {
-			await setUsbBlocking(inspectDevice.id, next);
-			setDevices((ds) => ds.map((d) => (d.id === inspectDevice.id ? { ...d, usbBlocking: next } : d)));
+			const updated = await setUsbBlocking(inspectDevice.id, enabled, durationMinutes);
+			const until = updated.usbBlockingUntil ?? null;
+			setUsbBlockingUntil(until);
+			setDevices((ds) =>
+				ds.map((d) => (d.id === inspectDevice.id ? { ...d, usbBlocking: enabled, usbBlockingUntil: until } : d)),
+			);
+			setInspectDevice((cur) => (cur ? { ...cur, usbBlocking: enabled, usbBlockingUntil: until } : cur));
 		} catch (err) {
-			setUsbBlockingEnabled(!next);
+			setUsbBlockingEnabled(prevEnabled);
+			setUsbBlockingUntil(prevUntil);
 			notify(err instanceof Error ? err.message : 'Failed to update USB blocking.');
 		}
 	};
@@ -563,19 +583,50 @@ export default function DevicesPage() {
 										<SectionTitle icon="usb" text="USB Peripheral Control" />
 										<span className={`px-3 py-1 text-[11px] font-bold rounded-full ${usbBlockingEnabled ? 'bg-primary/10 text-primary' : 'bg-outline-variant/50 text-on-surface-variant'}`}>{usbBlockingEnabled ? 'BLOCKED' : 'OPEN'}</span>
 									</div>
-									<div className="p-4 bg-white rounded-2xl border border-outline-variant/30 flex items-center justify-between">
+									<div className="p-4 bg-white rounded-2xl border border-outline-variant/30 space-y-3">
 										<div className="flex items-center gap-3">
 											<div className={`w-10 h-10 rounded-xl flex items-center justify-center ${usbBlockingEnabled ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
 												<span className="material-symbols-outlined">{usbBlockingEnabled ? 'lock' : 'lock_open'}</span>
 											</div>
 											<div>
 												<span className="font-semibold text-on-surface text-[14px] block">USB Storage Blocking</span>
-												<span className="text-[11px] text-on-surface-variant">Applies on the device's next heartbeat</span>
+												<span className="text-[11px] text-on-surface-variant">
+													{usbBlockingEnabled
+														? usbBlockingUntil
+															? `Blocked until ${formatDate(usbBlockingUntil)}`
+															: 'Blocked permanently'
+														: 'Pick how long to block, then apply. Takes effect on the next heartbeat.'}
+												</span>
 											</div>
 										</div>
-										<button type="button" onClick={handleToggleUsb} className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${usbBlockingEnabled ? 'bg-primary' : 'bg-outline-variant'}`}>
-											<span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition ${usbBlockingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-										</button>
+										{usbBlockingEnabled ? (
+											<button
+												type="button"
+												onClick={() => handleSetUsb(false)}
+												className="w-full py-2 rounded-xl bg-surface-container-high text-on-surface font-medium text-[13px] hover:bg-surface-container-high/70 cursor-pointer flex items-center justify-center gap-1.5"
+											>
+												<span className="material-symbols-outlined text-base">lock_open</span> Unblock now
+											</button>
+										) : (
+											<div className="flex items-center gap-2">
+												<select
+													value={usbDuration}
+													onChange={(e) => setUsbDuration(Number(e.target.value))}
+													className="flex-1 bg-surface-container-high border border-outline-variant/40 rounded-xl px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+												>
+													{USB_DURATIONS.map((o) => (
+														<option key={o.minutes} value={o.minutes}>{o.label}</option>
+													))}
+												</select>
+												<button
+													type="button"
+													onClick={() => handleSetUsb(true, usbDuration === 0 ? null : usbDuration)}
+													className="px-3.5 py-2 bg-primary text-on-primary font-medium text-[13px] rounded-xl hover:bg-primary/90 cursor-pointer whitespace-nowrap"
+												>
+													Block USB
+												</button>
+											</div>
+										)}
 									</div>
 								</div>
 							</div>

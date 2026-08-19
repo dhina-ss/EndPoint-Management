@@ -45,6 +45,9 @@ public class DeviceResponse
 
     public bool UsbBlockingEnabled { get; set; }
 
+    /// <summary>When USB blocking auto-expires (UTC); null = permanent while enabled.</summary>
+    public DateTime? UsbBlockingUntil { get; set; }
+
     public bool StoreGatingEnabled { get; set; }
 
     /// <summary>When true, the agent asks the user to sign in on every startup.</summary>

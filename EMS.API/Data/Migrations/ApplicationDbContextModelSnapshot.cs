@@ -277,6 +277,9 @@ namespace EMS.API.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<DateTime?>("UsbBlockingUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Username")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");

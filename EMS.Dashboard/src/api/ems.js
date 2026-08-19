@@ -89,6 +89,7 @@ export function mapDevice(d) {
     activatedOn: formatDate(d.activatedAt),
     lastInventoryUpdate: relativeTime(d.updatedDate),
     usbBlocking: d.usbBlockingEnabled,
+    usbBlockingUntil: d.usbBlockingUntil,
     storeGating: d.storeGatingEnabled,
     publicIp: d.publicIPAddress,
     city: d.locationCity,
@@ -176,11 +177,11 @@ export async function removeBlockedWebsite(id, blockId) {
   if (!res.ok && res.status !== 404) throwForStatus(res.status);
 }
 
-export async function setUsbBlocking(id, enabled) {
+export async function setUsbBlocking(id, enabled, durationMinutes = null) {
   const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(id)}/usb-blocking`, {
     method: 'PUT',
     headers: jsonHeaders,
-    body: JSON.stringify({ enabled }),
+    body: JSON.stringify({ enabled, durationMinutes }),
   });
   if (!res.ok) throwForStatus(res.status);
   return mapDevice(await res.json());

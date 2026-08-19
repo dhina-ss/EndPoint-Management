@@ -96,7 +96,7 @@ public class DevicesController : ControllerBase
         [FromBody] UsbBlockingUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var device = await _deviceService.SetUsbBlockingAsync(id, request.Enabled, cancellationToken);
+        var device = await _deviceService.SetUsbBlockingAsync(id, request.Enabled, request.DurationMinutes, cancellationToken);
         return device is null ? NotFound() : Ok(device);
     }
 

@@ -115,7 +115,7 @@ public class DeviceService : IDeviceService
     }
 
     public async Task<DeviceResponse?> SetUsbBlockingAsync(
-        Guid id, bool enabled, CancellationToken cancellationToken = default)
+        Guid id, bool enabled, int? durationMinutes, CancellationToken cancellationToken = default)
     {
         var device = await _deviceRepository.GetTrackedByIdAsync(id, cancellationToken);
         if (device is null)
@@ -124,10 +124,17 @@ public class DeviceService : IDeviceService
         }
 
         device.UsbBlockingEnabled = enabled;
+        // Enabled + a positive duration => auto-expire at now+duration; enabled
+        // with no duration => permanent (null); disabled => no expiry.
+        device.UsbBlockingUntil = enabled && durationMinutes is int m and > 0
+            ? DateTime.UtcNow.AddMinutes(m)
+            : null;
+
         await _deviceRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "USB blocking set to {Enabled} for device {DeviceId}.", enabled, device.DeviceId);
+            "USB blocking set to {Enabled} for device {DeviceId} (until {Until}).",
+            enabled, device.DeviceId, device.UsbBlockingUntil?.ToString("o") ?? "permanent");
 
         return MapToResponse(device);
     }
@@ -263,7 +270,14 @@ public class DeviceService : IDeviceService
             UpdatedDate = device.UpdatedDate,
             LastSeen = device.LastSeen,
             LastHeartbeatTime = device.LastHeartbeatTime,
-            UsbBlockingEnabled = device.UsbBlockingEnabled,
+            // Effective state: a stored block whose window has passed reads as
+            // off (the heartbeat clears it for real on the device's next beat).
+            UsbBlockingEnabled = device.UsbBlockingEnabled
+                && (device.UsbBlockingUntil is null || device.UsbBlockingUntil > utcNow),
+            UsbBlockingUntil = device.UsbBlockingEnabled
+                && device.UsbBlockingUntil is not null && device.UsbBlockingUntil > utcNow
+                    ? device.UsbBlockingUntil
+                    : null,
             StoreGatingEnabled = device.StoreGatingEnabled,
             RequireLoginEachStartup = device.RequireLoginEachStartup,
             ActivatedByUserId = device.ActivatedByUserId,

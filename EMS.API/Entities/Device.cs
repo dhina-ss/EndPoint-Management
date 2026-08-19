@@ -54,6 +54,13 @@ public class Device
     public bool UsbBlockingEnabled { get; set; }
 
     /// <summary>
+    /// When USB blocking is enabled, the UTC instant it auto-expires. Null with
+    /// blocking enabled means permanent. Cleared once the window passes (the
+    /// agent then unblocks on its next heartbeat).
+    /// </summary>
+    public DateTime? UsbBlockingUntil { get; set; }
+
+    /// <summary>
     /// When true, the agent keeps the Microsoft Store disabled on this device;
     /// a user must enter an EMS admin password (via the local unlock window)
     /// to temporarily re-enable it for installs. Applied on the next heartbeat.

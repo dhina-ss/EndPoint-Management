@@ -54,6 +54,15 @@ public class HeartbeatService : IHeartbeatService
         // A heartbeat means the device is awake again; clear any sleep marker.
         device.SuspendedAt = null;
 
+        // USB blocking auto-expiry: once the window has passed, clear it so this
+        // heartbeat tells the agent to unblock and the dashboard reflects it.
+        if (device.UsbBlockingEnabled && device.UsbBlockingUntil is DateTime until && until <= utcNow)
+        {
+            device.UsbBlockingEnabled = false;
+            device.UsbBlockingUntil = null;
+            _logger.LogInformation("USB blocking window expired for device {DeviceId}; auto-unblocked.", deviceId);
+        }
+
         await UpdateLocationAsync(device, publicIpAddress, utcNow, cancellationToken);
 
         var heartbeat = new DeviceHeartbeat
