@@ -63,7 +63,10 @@ public static class ServiceCollectionExtensions
             }
 
             client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
-        });
+        })
+        // Bypass the block-page system proxy so agent traffic always reaches
+        // the server directly, even while internet is blocked for browsers.
+        .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { UseProxy = false });
 
         return services;
     }

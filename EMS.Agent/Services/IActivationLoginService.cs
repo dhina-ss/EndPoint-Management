@@ -7,7 +7,8 @@ namespace EMS.Agent.Services;
 public interface IActivationLoginService
 {
     Task<ActivationLoginResult> LoginAndActivateAsync(
-        string employeeCode, string password, CancellationToken cancellationToken = default);
+        string employeeCode, string password, string licenseKey,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ActivationLoginResult(bool Success, string Message);

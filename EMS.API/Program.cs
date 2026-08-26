@@ -84,6 +84,7 @@ builder.Services.AddHttpClient<IGeoLocationService, GeoLocationService>(client =
 });
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ILicenseService, LicenseService>();
 
 // Salted PBKDF2 password hashing for dashboard users.
 builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();

@@ -47,8 +47,17 @@ public static class ProcessRunner
             await process.WaitForExitAsync(timeoutCts.Token);
             return new ProcessResult(false, process.ExitCode, output.ToString().Trim());
         }
-        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // The caller cancelled us (service shutdown, or the console cancelled
+            // this command): kill the whole tree so a hung installer never lingers,
+            // then let the caller observe the cancellation.
+            TryKill(process);
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // Internal timeout only (an EXE that silently showed UI in Session 0).
             TryKill(process);
             return new ProcessResult(true, -1, output.ToString().Trim());
         }

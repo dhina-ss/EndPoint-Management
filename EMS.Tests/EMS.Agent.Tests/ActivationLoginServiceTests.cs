@@ -44,7 +44,7 @@ public class ActivationLoginServiceTests
         var service = CreateService(Json(HttpStatusCode.OK,
             """{"success":true,"message":"Login successful","username":"jane.doe","email":"j@x.com"}"""));
 
-        var result = await service.LoginAndActivateAsync("jane.doe", "Secret123!");
+        var result = await service.LoginAndActivateAsync("jane.doe", "Secret123!", "TL-TEST");
 
         Assert.True(result.Success);
         Assert.True(_store.Activated);
@@ -57,7 +57,7 @@ public class ActivationLoginServiceTests
         var service = CreateService(Json(HttpStatusCode.OK,
             """{"success":false,"message":"Invalid username or password."}"""));
 
-        var result = await service.LoginAndActivateAsync("jane.doe", "wrong");
+        var result = await service.LoginAndActivateAsync("jane.doe", "wrong", "TL-TEST");
 
         Assert.False(result.Success);
         Assert.Equal("Invalid username or password.", result.Message);
@@ -69,7 +69,7 @@ public class ActivationLoginServiceTests
     {
         var service = CreateService(Json(HttpStatusCode.OK, """{"success":true}"""));
 
-        var result = await service.LoginAndActivateAsync("", "");
+        var result = await service.LoginAndActivateAsync("", "", "TL-TEST");
 
         Assert.False(result.Success);
         Assert.False(_store.Activated);
@@ -93,11 +93,14 @@ public class ActivationLoginServiceTests
         public bool IsActivated() => Activated;
         public string? ActivatedBy() => ActivatedByUser;
         public string? SessionBootId() => null;
+        public string? LicenseKey() => LicenseKeyValue;
+        public string? LicenseKeyValue { get; private set; }
 
-        public void Activate(string activatedBy)
+        public void Activate(string activatedBy, string? licenseKey = null)
         {
             Activated = true;
             ActivatedByUser = activatedBy;
+            LicenseKeyValue = licenseKey;
         }
     }
 }

@@ -13,8 +13,14 @@ public class ApiSettings
     /// <summary>Relative path of the device registration endpoint.</summary>
     public string RegisterEndpoint { get; set; } = "/api/devices/register";
 
+    /// <summary>Called on uninstall so the server removes this device's record.</summary>
+    public string UnregisterEndpoint { get; set; } = "/api/devices/unregister";
+
     /// <summary>Relative path of the user login endpoint (agent activation and Store unlock).</summary>
     public string LoginEndpoint { get; set; } = "/api/auth/login";
+
+    /// <summary>Validates a tenant license key during activation (step 1).</summary>
+    public string LicenseValidateEndpoint { get; set; } = "/api/licenses/validate";
 
     /// <summary>How long a Microsoft Store unlock lasts, in minutes.</summary>
     public int StoreUnlockMinutes { get; set; } = 15;
@@ -80,8 +86,14 @@ public class ApiSettings
     /// <summary>Relative path the agent downloads an installer package from (append "/{id}/content").</summary>
     public string PackageContentEndpoint { get; set; } = "/api/packages";
 
+    /// <summary>Relative path the agent reads a single command's status from (append "/{id}/status").</summary>
+    public string CommandStatusEndpoint { get; set; } = "/api/devices/commands";
+
     /// <summary>How often the agent polls for pending commands, in seconds.</summary>
     public int CommandPollIntervalSeconds { get; set; } = 30;
+
+    /// <summary>How often the agent re-checks whether a running command was cancelled, in seconds.</summary>
+    public int CommandCancelPollSeconds { get; set; } = 5;
 
     /// <summary>Hard timeout for a single install/uninstall process, in minutes.</summary>
     public int CommandTimeoutMinutes { get; set; } = 10;

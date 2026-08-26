@@ -33,7 +33,9 @@ public class ActivationStore : IActivationStore
 
     public string? SessionBootId() => ReadDocument()?.SessionBootId;
 
-    public void Activate(string activatedBy)
+    public string? LicenseKey() => ReadDocument()?.LicenseKey;
+
+    public void Activate(string activatedBy, string? licenseKey = null)
     {
         try
         {
@@ -42,6 +44,7 @@ public class ActivationStore : IActivationStore
             var document = new ActivationDocument
             {
                 ActivatedBy = activatedBy,
+                LicenseKey = licenseKey,
                 ActivatedAt = DateTime.UtcNow,
                 // Stamp the current power-on session so the require-login-each-
                 // startup policy can tell this boot from the next one.
@@ -49,7 +52,8 @@ public class ActivationStore : IActivationStore
             };
 
             UserWritableFile.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
-            _logger.LogInformation("Device activated by {User}.", activatedBy);
+            _logger.LogInformation("Device activated by {User} (tenant license {License}).",
+                activatedBy, string.IsNullOrEmpty(licenseKey) ? "none" : licenseKey);
         }
         catch (Exception ex)
         {
@@ -83,6 +87,8 @@ public class ActivationStore : IActivationStore
     private sealed class ActivationDocument
     {
         public string? ActivatedBy { get; set; }
+
+        public string? LicenseKey { get; set; }
 
         public DateTime ActivatedAt { get; set; }
 

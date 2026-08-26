@@ -10,6 +10,12 @@ public interface IApiClientService
     Task<bool> RegisterDeviceAsync(DeviceInventoryModel inventory, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Tells the server this device is being uninstalled so it removes the
+    /// device record. Best-effort; used from the uninstaller.
+    /// </summary>
+    Task<bool> ReportUninstallAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Sends a liveness heartbeat using the stored device token. Returns a
     /// failed outcome (without calling the server) when the agent has not
     /// registered yet.
@@ -55,6 +61,13 @@ public interface IApiClientService
     /// <summary>Reports the outcome of a command back to the server.</summary>
     Task<bool> ReportCommandResultAsync(
         Guid commandId, CommandResultModel result, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches the current server-side status of a command (e.g. "Dispatched",
+    /// "Cancelled"). Used to abort a running install promptly when the console
+    /// cancels it. Returns null if the status could not be read.
+    /// </summary>
+    Task<string?> GetCommandStatusAsync(Guid commandId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Downloads an installer package to a temp file, verifying its SHA-256.

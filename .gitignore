@@ -486,3 +486,11 @@ $RECYCLE.BIN/
 # EMS: built agent installers - distribute via GitHub Releases, not git
 # (27MB+ each; committing every version bloated .git to >1GB and broke CI clones)
 installer/output/
+
+# API local secrets: real connection strings live here, not in git.
+# Production reads ConnectionStrings__DefaultConnection from the environment.
+EMS.API/appsettings.json
+EMS.API/appsettings.Development.json
+
+# App config that may hold real secrets - use appsettings.example.json as the template
+EMS.API/appsettings.json

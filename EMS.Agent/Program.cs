@@ -15,7 +15,8 @@ if (args.Contains("--login"))
 
     var loginBuilder = Host.CreateApplicationBuilder(args);
     loginBuilder.Services.AddAgentServices(loginBuilder.Configuration);
-    loginBuilder.Services.AddHttpClient<IActivationLoginService, ActivationLoginService>((sp, client) =>
+
+    void ConfigureApiClient(IServiceProvider sp, HttpClient client)
     {
         var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EMS.Agent.Configuration.ApiSettings>>().Value;
         if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
@@ -23,13 +24,25 @@ if (args.Contains("--login"))
             client.BaseAddress = new Uri(settings.BaseUrl);
         }
         client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
-    });
+    }
+
+    // UseProxy=false so the sign-in call bypasses the block-page system proxy
+    // (which is active precisely while this window is up) and reaches the server.
+    static System.Net.Http.HttpClientHandler DirectHandler() =>
+        new System.Net.Http.HttpClientHandler { UseProxy = false };
+
+    loginBuilder.Services.AddHttpClient<IActivationLoginService, ActivationLoginService>(ConfigureApiClient)
+        .ConfigurePrimaryHttpMessageHandler(DirectHandler);
+    loginBuilder.Services.AddHttpClient<ILicenseActivationService, LicenseActivationService>(ConfigureApiClient)
+        .ConfigurePrimaryHttpMessageHandler(DirectHandler);
 
     using var loginHost = loginBuilder.Build();
     var loginService = loginHost.Services.GetRequiredService<IActivationLoginService>();
+    var licenseService = loginHost.Services.GetRequiredService<ILicenseActivationService>();
 
     ApplicationConfiguration.Initialize();
-    System.Windows.Forms.Application.Run(new LoginForm(loginService));
+    // Two-step activation: license key first, then employee sign-in.
+    System.Windows.Forms.Application.Run(new LicenseActivationForm(licenseService, loginService));
     return;
 }
 
@@ -89,6 +102,36 @@ if (args.Contains("--verify-admin"))
     Environment.Exit(authForm.Authorized ? 0 : 1);
 }
 
+// Uninstall notification: the uninstaller runs this (after admin authorization,
+// before local state is wiped) so the server removes this device's record.
+if (args.Contains("--report-uninstall"))
+{
+    ConsoleWindowHelper.DetachConsole();
+
+    var reportBuilder = Host.CreateApplicationBuilder(args);
+    reportBuilder.Services.AddAgentServices(reportBuilder.Configuration);
+
+    using var reportHost = reportBuilder.Build();
+    var apiClient = reportHost.Services.GetRequiredService<IApiClientService>();
+    try
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        apiClient.ReportUninstallAsync(cts.Token).GetAwaiter().GetResult();
+    }
+    catch
+    {
+        // Best-effort: never block the uninstall on a server round-trip.
+    }
+
+    // Remove the block-page root certificate we installed, so uninstalling the
+    // agent fully removes its trust footprint.
+    if (OperatingSystem.IsWindows())
+    {
+        EMS.Agent.Services.BlockCertificateService.RemoveTrustedRoot();
+    }
+    return;
+}
+
 // Foreground-window tracking cannot run inside the Windows Service: services
 // run in Session 0, which has no desktop and cannot see the interactive
 // user's foreground window (that isolation is deliberate, since Windows
@@ -120,6 +163,9 @@ if (args.Contains("--usage-tracker"))
     trackerBuilder.Services.AddHostedService<TrayIconWorker>();
     // Optional precise GPS location (falls back to the server's IP location).
     trackerBuilder.Services.AddHostedService<LocationWorker>();
+    // Branded "internet blocked - please sign in" page + system proxy, shown
+    // while the require-login policy holds this session.
+    trackerBuilder.Services.AddHostedService<BlockPageWorker>();
     trackerBuilder.Build().Run();
     return;
 }
@@ -138,6 +184,27 @@ builder.Services.AddHostedService<HeartbeatWorker>();
 // Software-management command queue runs only in the SYSTEM service, which has
 // the rights to install/uninstall machine-wide software.
 builder.Services.AddHostedService<CommandWorker>();
+// Enforces "require sign-in on every startup" by blocking internet (firewall)
+// until the user signs in; needs SYSTEM rights, so it lives in the service.
+builder.Services.AddHostedService<LoginEnforcementWorker>();
+
+// Serves the branded "site blocked" page (HTTP + HTTPS) for domains the hosts
+// file redirects to loopback; installs the local trusted root it signs with.
+// Needs SYSTEM rights to bind :80/:443 and write the machine trust store.
+builder.Services.AddHostedService<WebsiteBlockPageWorker>();
+
+// Learns the tenant's require-login policy from the bundled license before the
+// first activation, so a fresh device enforces it from boot one.
+builder.Services.AddHttpClient<ILicenseActivationService, LicenseActivationService>((sp, client) =>
+{
+    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EMS.Agent.Configuration.ApiSettings>>().Value;
+    if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+    {
+        client.BaseAddress = new Uri(settings.BaseUrl);
+    }
+    client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+}).ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { UseProxy = false });
+builder.Services.AddHostedService<LicensePolicySyncWorker>();
 
 var host = builder.Build();
 host.Run();

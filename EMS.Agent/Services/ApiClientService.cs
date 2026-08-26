@@ -78,6 +78,31 @@ public class ApiClientService : IApiClientService
         return false;
     }
 
+    public async Task<bool> ReportUninstallAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+            var token = await _tokenService.GetTokenAsync(cancellationToken);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.UnregisterEndpoint);
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                request.Headers.Add(DeviceAuthHeaders.Token, token);
+            }
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            _logger.LogInformation("Uninstall reported to server: {StatusCode}.", (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not report uninstall to the server.");
+            return false;
+        }
+    }
+
     public async Task<HeartbeatOutcome> SendHeartbeatAsync(HeartbeatModel heartbeat, CancellationToken cancellationToken = default)
     {
         var token = await _tokenService.GetTokenAsync(cancellationToken);
@@ -447,6 +472,45 @@ public class ApiClientService : IApiClientService
             _logger.LogWarning(ex, "Command result report could not reach the EMS server.");
             return false;
         }
+    }
+
+    public async Task<string?> GetCommandStatusAsync(
+        Guid commandId, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return null;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+        var endpoint = $"{_settings.CommandStatusEndpoint.TrimEnd('/')}/{commandId}/status";
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<CommandStatusResponse>(cancellationToken);
+            return payload?.Status;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogDebug(ex, "Command status check could not reach the EMS server.");
+            return null;
+        }
+    }
+
+    private sealed class CommandStatusResponse
+    {
+        public string? Status { get; set; }
     }
 
     public async Task<string?> DownloadPackageAsync(

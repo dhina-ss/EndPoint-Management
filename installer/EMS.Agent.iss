@@ -4,11 +4,10 @@
 ; Build (from the repository root):
 ;   1. dotnet publish EMS.Agent -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ;   2. "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\EMS.Agent.iss
-;   -> installer\output\EMSAgentSetup-<version>.exe
+;   -> installer\output\TheLanceEMSSetup-<version>.exe
 ; ------------------------------------------------------------------
 
 #define MyAppName "The Lance Endpoint"
-#define MyAppVersion "1.0.15"
 #define MyAppPublisher "The Lance"
 #define MyAppExeName "EMS.Agent.exe"
 ; Internal service id kept as "EMSAgent" so upgrades over existing installs
@@ -21,6 +20,13 @@
 ; net8.0 or plain net8.0-windows. Pointing this at the wrong folder silently
 ; ships a stale build.
 #define PublishDir "..\EMS.Agent\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish"
+; Version is read from the compiled agent (stamped from EMS.Agent.csproj <Version>),
+; so the installer, the Add/Remove Programs entry, and the version the agent
+; reports to the console all come from one source and can never drift. The 4-part
+; file version (e.g. "1.0.17.0") is trimmed to 3 parts for clean filenames.
+#define AgentExePath AddBackslash(PublishDir) + MyAppExeName
+#define FullAgentVersion GetVersionNumbersString(AgentExePath)
+#define MyAppVersion Copy(FullAgentVersion, 1, RPos(".", FullAgentVersion) - 1)
 
 [Setup]
 ; Never change AppId between versions - it is how upgrades find the install.
@@ -36,14 +42,19 @@ DefaultDirName={autopf}\EMS Agent
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 DisableDirPage=yes
+; Make the Terms page the last page before install so its gated button reads
+; "Install" (there is no separate Ready/confirmation page).
+DisableReadyPage=yes
 OutputDir=output
-OutputBaseFilename=EMSAgentSetup-{#MyAppVersion}
+OutputBaseFilename=TheLanceEMSSetup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+; The Lance (TL) branding on the setup and Add/Remove Programs entry.
+SetupIconFile=TheLance.ico
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
@@ -52,8 +63,9 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 ; not part of the installed application.
 Source: "ReencodeUtf16.ps1"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "{#PublishDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; Keep an existing (possibly customized) config on upgrade.
-Source: "{#PublishDir}\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+; Always apply the bundled config (the backend URL is baked at build time),
+; so a reinstall/upgrade updates BaseUrl instead of keeping a stale one.
+Source: "{#PublishDir}\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
 ; Everything else from the publish folder, minus dev/debug artifacts.
 ; With a single-file publish this matches nothing, hence skipifsourcedoesntexist.
 Source: "{#PublishDir}\*"; DestDir: "{app}"; \
@@ -94,6 +106,91 @@ Filename: "{sys}\sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--login"; Description: "Activate The Lance Endpoint (sign in)"; Flags: postinstall nowait skipifsilent
 
 [Code]
+// ---- Terms & Conditions gate ----
+// A custom wizard page (after Welcome) shows the terms and an "I accept"
+// checkbox. The Next/Install button stays disabled until the box is ticked.
+var
+  TermsPageID: Integer;
+  AcceptTermsCheckBox: TNewCheckBox;
+
+procedure AcceptTermsClick(Sender: TObject);
+begin
+  WizardForm.NextButton.Enabled := AcceptTermsCheckBox.Checked;
+end;
+
+procedure InitializeWizard();
+var
+  TermsPage: TWizardPage;
+  Memo: TNewMemo;
+begin
+  // Remove the (broken) default header image from the wizard.
+  WizardForm.WizardSmallBitmapImage.Visible := False;
+
+  TermsPage := CreateCustomPage(wpWelcome, 'Terms and Conditions',
+    'Please read and accept the terms to continue installing The Lance Endpoint.');
+  TermsPageID := TermsPage.ID;
+
+  Memo := TNewMemo.Create(TermsPage);
+  Memo.Parent := TermsPage.Surface;
+  Memo.Left := 0;
+  Memo.Top := 0;
+  Memo.Width := TermsPage.SurfaceWidth;
+  Memo.Height := TermsPage.SurfaceHeight - ScaleY(30);
+  // Anchor to all edges so the memo fills the page width/height even after the
+  // surface is scaled up for high-DPI displays (controls created here don't
+  // auto-stretch otherwise).
+  Memo.Anchors := [akLeft, akTop, akRight, akBottom];
+  Memo.ScrollBars := ssVertical;
+  Memo.ReadOnly := True;
+  Memo.WordWrap := True;
+  Memo.Lines.Add('THE LANCE ENDPOINT - TERMS AND CONDITIONS');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('By installing The Lance Endpoint ("the Software") you agree to the following terms.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('1. Authorized deployment. The Software is enterprise endpoint-management software.');
+  Memo.Lines.Add('   It must be installed only on devices owned or administered by the organization');
+  Memo.Lines.Add('   licensed to use it, and only with that organization''s authorization. Installing it');
+  Memo.Lines.Add('   on a device you are not authorized to manage is prohibited.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('2. Licensing. Use of the Software requires a valid tenant license key. Each license is');
+  Memo.Lines.Add('   bound to the licensed organization and may not be shared, resold, or transferred.');
+  Memo.Lines.Add('   Features and the number of devices are governed by that license and may expire.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('3. Monitoring and data collection. When activated, the Software runs a background');
+  Memo.Lines.Add('   service that may collect and report device inventory, installed and used applications,');
+  Memo.Lines.Add('   network usage, working hours, approximate and GPS location, and security (antivirus)');
+  Memo.Lines.Add('   status, and may enforce policies such as USB blocking and website filtering. This data');
+  Memo.Lines.Add('   is sent to the administering organization''s management dashboard.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('4. Activation. The Software remains inactive until an authorized user signs in with a');
+  Memo.Lines.Add('   valid license key and employee credentials.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('5. Removal. Uninstalling the Software requires administrator authorization.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('6. No warranty. The Software is provided "as is" without warranties of any kind. To the');
+  Memo.Lines.Add('   maximum extent permitted by law, The Lance is not liable for any damages arising from');
+  Memo.Lines.Add('   its use.');
+  Memo.Lines.Add('');
+  Memo.Lines.Add('If you do not agree to these terms, do not install the Software.');
+
+  AcceptTermsCheckBox := TNewCheckBox.Create(TermsPage);
+  AcceptTermsCheckBox.Parent := TermsPage.Surface;
+  AcceptTermsCheckBox.Left := 0;
+  AcceptTermsCheckBox.Top := TermsPage.SurfaceHeight - ScaleY(20);
+  AcceptTermsCheckBox.Width := TermsPage.SurfaceWidth;
+  AcceptTermsCheckBox.Anchors := [akLeft, akRight, akBottom];
+  AcceptTermsCheckBox.Caption := 'I accept the Terms and Conditions';
+  AcceptTermsCheckBox.OnClick := @AcceptTermsClick;
+end;
+
+// Disable the Next/Install button whenever the terms page is shown until the
+// box is ticked; other pages keep their normal button state.
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = TermsPageID then
+    WizardForm.NextButton.Enabled := AcceptTermsCheckBox.Checked;
+end;
+
 // Application usage (foreground-window) tracking cannot run inside the
 // Windows Service: services execute in Session 0, which has no desktop and
 // cannot observe the interactive user's foreground window. It runs instead
@@ -287,7 +384,17 @@ begin
   end;
 
   if CurStep = ssPostInstall then
+  begin
     RegisterUsageTrackerTask();
+    // If the download bundle placed a license.key next to the installer, copy
+    // it so the agent knows its tenant/policy before the first activation.
+    if FileExists(ExpandConstant('{src}\license.key')) then
+    begin
+      ForceDirectories(ExpandConstant('{commonappdata}\EMS.Agent'));
+      FileCopy(ExpandConstant('{src}\license.key'),
+               ExpandConstant('{commonappdata}\EMS.Agent\license.key'), False);
+    end;
+  end;
 end;
 
 // Uninstall protection: require EMS admin authorization before anything is
@@ -332,11 +439,47 @@ end;
 
 // Uninstall path: stop and remove the service and the scheduled task before
 // files are deleted.
+// Restore internet if this device was left blocked by the require-login policy,
+// so uninstalling never strands the machine offline.
+procedure RestoreInternetAccess();
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\netsh.exe'),
+    'advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\netsh.exe'),
+    'advfirewall firewall delete rule name="TheLanceEndpoint-Allow-Agent"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\netsh.exe'),
+    'advfirewall firewall delete rule name="TheLanceEndpoint-Allow-DNS"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Clear the block-page browser proxy for the user running the uninstall.
+  Exec(ExpandConstant('{sys}\reg.exe'),
+    'add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\reg.exe'),
+    'delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /f',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
 begin
   if CurUninstallStep = usUninstall then
   begin
     StopAndDeleteService();
     RemoveUsageTrackerTask();
+    RestoreInternetAccess();
+    // Tell the server to remove this device's record. Runs while the exe and
+    // device identity still exist (before the DelTree below); best-effort with
+    // a short wait so a slow/unreachable server can't hang the uninstall long.
+    if FileExists(ExpandConstant('{app}\{#MyAppExeName}')) then
+      Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--report-uninstall', '',
+           SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Clear activation/auth state so a later reinstall starts not-activated
+    // (otherwise the tray reads the leftover activation.json as "Activated").
+    DelTree(ExpandConstant('{commonappdata}\EMS.Agent'), True, True, True);
   end;
 end;

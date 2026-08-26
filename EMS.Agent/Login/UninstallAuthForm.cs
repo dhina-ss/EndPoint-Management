@@ -13,7 +13,7 @@ public sealed class UninstallAuthForm : Form
 {
     private readonly IAdminAuthService _authService;
 
-    private readonly TextBox _employeeCodeBox;
+    private readonly TextBox _emailBox;
     private readonly TextBox _passwordBox;
     private readonly Label _statusLabel;
     private readonly Button _authorizeButton;
@@ -49,8 +49,8 @@ public sealed class UninstallAuthForm : Form
             Location = new Point(20, 46),
         };
 
-        var codeLabel = new Label { Text = "Admin employee code", AutoSize = true, Location = new Point(20, 86) };
-        _employeeCodeBox = new TextBox { Location = new Point(20, 106), Size = new Size(360, 24) };
+        var codeLabel = new Label { Text = "Admin email", AutoSize = true, Location = new Point(20, 86) };
+        _emailBox = new TextBox { Location = new Point(20, 106), Size = new Size(360, 24) };
 
         var passwordLabel = new Label { Text = "Password", AutoSize = true, Location = new Point(20, 142) };
         _passwordBox = new TextBox { Location = new Point(20, 162), Size = new Size(360, 24), PasswordChar = '●' };
@@ -84,7 +84,7 @@ public sealed class UninstallAuthForm : Form
 
         Controls.AddRange(new Control[]
         {
-            heading, subheading, codeLabel, _employeeCodeBox,
+            heading, subheading, codeLabel, _emailBox,
             passwordLabel, _passwordBox, _statusLabel, _authorizeButton, cancelButton,
         });
     }
@@ -95,7 +95,7 @@ public sealed class UninstallAuthForm : Form
 
         try
         {
-            var result = await _authService.VerifyAsync(_employeeCodeBox.Text, _passwordBox.Text);
+            var result = await _authService.VerifyAsync(_emailBox.Text, _passwordBox.Text);
             if (result.Success)
             {
                 Authorized = true;
@@ -114,7 +114,7 @@ public sealed class UninstallAuthForm : Form
     private void SetBusy(bool busy, string status, Color color)
     {
         _authorizeButton.Enabled = !busy;
-        _employeeCodeBox.Enabled = !busy;
+        _emailBox.Enabled = !busy;
         _passwordBox.Enabled = !busy;
         _statusLabel.ForeColor = color;
         _statusLabel.Text = status;

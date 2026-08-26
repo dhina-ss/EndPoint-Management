@@ -100,19 +100,40 @@ public class CommandWorker : BackgroundService
         PendingCommandModel command, ICommandExecutionService executor,
         IApiClientService apiClient, CancellationToken stoppingToken)
     {
+        // Link the service-shutdown token with a per-command token that the
+        // cancellation monitor can trip if the console cancels this command.
+        // ProcessRunner kills the whole installer tree when this token fires, so
+        // a cancelled or hung install never head-of-line-blocks the queue.
+        using var commandCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var monitor = MonitorCancellationAsync(command.Id, apiClient, commandCts);
+
         CommandExecutionResult result;
         try
         {
-            result = await executor.ExecuteAsync(command, stoppingToken);
+            result = await executor.ExecuteAsync(command, commandCts.Token);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Real service shutdown: stop the loop.
+            throw;
         }
         catch (OperationCanceledException)
         {
-            throw;
+            // The console cancelled this command; ProcessRunner already killed the
+            // process. The server already holds it as Cancelled, so don't report.
+            _logger.LogInformation("Command {CommandId} ({Type}) was cancelled from the console.", command.Id, command.Type);
+            return;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Command {CommandId} ({Type}) threw.", command.Id, command.Type);
             result = CommandExecutionResult.Fail($"Unhandled error: {ex.Message}");
+        }
+        finally
+        {
+            // Stop the monitor and let it unwind.
+            commandCts.Cancel();
+            try { await monitor; } catch { /* monitor is best-effort */ }
         }
 
         _logger.LogInformation(
@@ -128,6 +149,39 @@ public class CommandWorker : BackgroundService
                 Message = result.Message
             },
             stoppingToken);
+    }
+
+    /// <summary>
+    /// While a command runs, periodically asks the server whether it has been
+    /// cancelled from the console; if so, trips <paramref name="commandCts"/> so
+    /// the running installer is killed and the queue moves on. Best-effort.
+    /// </summary>
+    private async Task MonitorCancellationAsync(
+        Guid commandId, IApiClientService apiClient, CancellationTokenSource commandCts)
+    {
+        var interval = TimeSpan.FromSeconds(Math.Max(2, _apiSettings.CommandCancelPollSeconds));
+        try
+        {
+            while (!commandCts.IsCancellationRequested)
+            {
+                await Task.Delay(interval, commandCts.Token);
+                var status = await apiClient.GetCommandStatusAsync(commandId, commandCts.Token);
+                if (string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Console cancelled command {CommandId}; aborting the running process.", commandId);
+                    commandCts.Cancel();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Command finished (or shutdown): the monitor is done.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Cancellation monitor for command {CommandId} failed.", commandId);
+        }
     }
 
     /// <summary>

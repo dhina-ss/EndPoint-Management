@@ -27,7 +27,8 @@ public class ActivationLoginService : IActivationLoginService
     }
 
     public async Task<ActivationLoginResult> LoginAndActivateAsync(
-        string employeeCode, string password, CancellationToken cancellationToken = default)
+        string employeeCode, string password, string licenseKey,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(password))
         {
@@ -38,11 +39,13 @@ public class ActivationLoginService : IActivationLoginService
         {
             // Send this endpoint's DeviceId so the server can enforce
             // one-account-per-device and reject activation on a second machine.
+            // The licenseKey scopes the sign-in to its tenant: the server only
+            // accepts the credentials if the user belongs to that tenant.
             var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
 
             using var response = await _httpClient.PostAsJsonAsync(
                 _settings.LoginEndpoint,
-                new { employeeCode = employeeCode.Trim(), password, deviceId },
+                new { employeeCode = employeeCode.Trim(), password, deviceId, licenseKey = licenseKey.Trim() },
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -57,9 +60,9 @@ public class ActivationLoginService : IActivationLoginService
                 return new ActivationLoginResult(false, result?.Message ?? "Invalid username or password.");
             }
 
-            // Store the employee code (what the user signed in with) so the
-            // server can map this device to that user on the next registration.
-            _activationStore.Activate(employeeCode.Trim());
+            // Store the employee code and license key so the server can map this
+            // device to that user + tenant on the next registration.
+            _activationStore.Activate(employeeCode.Trim(), licenseKey.Trim());
             return new ActivationLoginResult(true, "The Lance Endpoint activated successfully.");
         }
         catch (HttpRequestException ex)

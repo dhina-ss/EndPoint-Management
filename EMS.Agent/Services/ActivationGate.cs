@@ -29,9 +29,13 @@ public class ActivationGate : IActivationGate
         return SignedInThisSession();
     }
 
+    // Internet/login enforcement is driven by the policy alone, NOT by prior
+    // enrollment: a freshly-installed device whose tenant requires sign-in on
+    // startup must sign in (activate) before it can browse. The policy is
+    // learned from the bundled license before the first activation, and from
+    // the heartbeat afterwards.
     public bool NeedsSessionLogin()
-        => _activationStore.IsActivated()
-            && _loginPolicyStore.RequireLoginEachStartup()
+        => _loginPolicyStore.RequireLoginEachStartup()
             && !SignedInThisSession();
 
     /// <summary>

@@ -14,7 +14,7 @@ public sealed record AdminAuthResult(bool Success, string Message);
 public interface IAdminAuthService
 {
     Task<AdminAuthResult> VerifyAsync(
-        string employeeCode, string password, CancellationToken cancellationToken = default);
+        string email, string password, CancellationToken cancellationToken = default);
 }
 
 public class AdminAuthService : IAdminAuthService
@@ -32,19 +32,26 @@ public class AdminAuthService : IAdminAuthService
     }
 
     public async Task<AdminAuthResult> VerifyAsync(
-        string employeeCode, string password, CancellationToken cancellationToken = default)
+        string email, string password, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            return new AdminAuthResult(false, "Enter the admin employee code and password.");
+            return new AdminAuthResult(false, "Enter the admin email and password.");
         }
 
         try
         {
             using var response = await _httpClient.PostAsJsonAsync(
                 _settings.LoginEndpoint,
-                new { employeeCode = employeeCode.Trim(), password },
+                new { email = email.Trim(), password },
                 cancellationToken);
+
+            // Wrong credentials come back as 401; treat that as "invalid",
+            // not a transient server error.
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                return new AdminAuthResult(false, "Invalid admin email or password.");
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -55,7 +62,7 @@ public class AdminAuthService : IAdminAuthService
             var result = await response.Content.ReadFromJsonAsync<LoginResult>(cancellationToken);
             return result?.Success == true
                 ? new AdminAuthResult(true, "Authorized.")
-                : new AdminAuthResult(false, result?.Message ?? "Invalid employee code or password.");
+                : new AdminAuthResult(false, result?.Message ?? "Invalid admin email or password.");
         }
         catch (HttpRequestException ex)
         {

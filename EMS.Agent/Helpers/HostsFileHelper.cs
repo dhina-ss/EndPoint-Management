@@ -20,7 +20,11 @@ public static class HostsFileHelper
 {
     private const string BeginMarker = "# BEGIN EMS BLOCKLIST - managed by EMS Agent, do not edit";
     private const string EndMarker = "# END EMS BLOCKLIST";
-    private const string BlackholeAddress = "0.0.0.0";
+    // Point blocked domains at loopback (not 0.0.0.0) so the agent's local
+    // block-page server can answer them with the branded "site blocked" page
+    // over HTTP and HTTPS. If that server isn't listening, the connection is
+    // simply refused - the site stays blocked either way.
+    private const string BlackholeAddress = "127.0.0.1";
 
     private static string HostsFilePath =>
         Path.Combine(Environment.SystemDirectory, "drivers", "etc", "hosts");

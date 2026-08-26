@@ -17,7 +17,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-EMS.Agent-0fdb5ff2-d827-4c2a-9646-89e123494e24</UserSecretsId>
+    <!-- The Lance branding: the exe (and its Add/Remove Programs entry) shows
+         the TL mark. -->
+    <ApplicationIcon>TheLance.ico</ApplicationIcon>
+    <AssemblyTitle>The Lance Endpoint</AssemblyTitle>
+    <Product>The Lance Endpoint</Product>
+    <Company>The Lance</Company>
+    <!-- Single source of truth for the agent version. The agent reports this at
+         runtime (Assembly version -> heartbeat -> console "Agent Version"), and
+         the installer reads it back off the compiled exe (see EMS.Agent.iss),
+         so bumping it here is the only place a release version changes. Override
+         at build time with -p:Version=x.y.z if needed. -->
+    <Version>1.0.17</Version>
   </PropertyGroup>
+
+  <!-- Branding assets loaded at runtime for the tray icon and activation window. -->
+  <ItemGroup>
+    <EmbeddedResource Include="TheLance.ico" />
+    <EmbeddedResource Include="Login\thelance-logo.png" />
+    <EmbeddedResource Include="thelance-logo-white.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />

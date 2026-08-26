@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using EMS.Agent.Branding;
 using EMS.Agent.Services;
 
 namespace EMS.Agent.Login;
@@ -13,17 +14,20 @@ namespace EMS.Agent.Login;
 public sealed class LoginForm : Form
 {
     private readonly IActivationLoginService _loginService;
+    private readonly string _licenseKey;
 
     private readonly TextField _employeeCodeField;
     private readonly TextField _passwordField;
     private readonly Label _statusLabel;
     private readonly Button _activateButton;
 
-    public LoginForm(IActivationLoginService loginService)
+    public LoginForm(IActivationLoginService loginService, string licenseKey, string? tenantName = null)
     {
         _loginService = loginService;
+        _licenseKey = licenseKey;
 
         Text = "The Lance Endpoint — Activation";
+        try { Icon = BrandingAssets.AppIcon(); } catch { /* non-fatal */ }
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
@@ -33,7 +37,7 @@ public sealed class LoginForm : Form
 
         var heading = new Label
         {
-            Text = "Sign in to activate EMS",
+            Text = "Sign in to activate",
             Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             AutoSize = true,
             Location = new Point(20, 18),
@@ -41,7 +45,9 @@ public sealed class LoginForm : Form
 
         var subheading = new Label
         {
-            Text = "Use your EMS dashboard account.",
+            Text = string.IsNullOrWhiteSpace(tenantName)
+                ? "Use your employee account."
+                : $"Tenant: {tenantName}. Use your employee account.",
             ForeColor = SystemColors.GrayText,
             AutoSize = true,
             Location = new Point(20, 46),
@@ -84,7 +90,7 @@ public sealed class LoginForm : Form
         try
         {
             var result = await _loginService.LoginAndActivateAsync(
-                _employeeCodeField.Value, _passwordField.Value);
+                _employeeCodeField.Value, _passwordField.Value, _licenseKey);
 
             if (result.Success)
             {

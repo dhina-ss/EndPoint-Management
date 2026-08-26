@@ -15,8 +15,11 @@ public interface IActivationStore
     /// </summary>
     bool IsActivated();
 
-    /// <summary>Records a successful activation by the given EMS username.</summary>
-    void Activate(string activatedBy);
+    /// <summary>Records a successful activation by the given EMS username and tenant license key.</summary>
+    void Activate(string activatedBy, string? licenseKey = null);
+
+    /// <summary>The tenant license key this device was activated with, if any.</summary>
+    string? LicenseKey();
 
     /// <summary>The EMS username that activated this device, if any.</summary>
     string? ActivatedBy();
