@@ -113,6 +113,13 @@ public sealed class TrayIconContext : ApplicationContext
     {
         try
         {
+            // Don't open a second window if one is already up (installer,
+            // block page, or a prior launch) - just bring it forward.
+            if (EMS.Agent.Helpers.ActivationInstance.IsOpen())
+            {
+                EMS.Agent.Helpers.ActivationInstance.BringToFront();
+                return null;
+            }
             var exe = Environment.ProcessPath;
             if (!string.IsNullOrEmpty(exe))
             {

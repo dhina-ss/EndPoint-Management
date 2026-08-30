@@ -13,6 +13,15 @@ if (args.Contains("--login"))
 {
     ConsoleWindowHelper.DetachConsole();
 
+    // Single-instance: if an activation window is already open (installer,
+    // tray, block page, or Start Menu), surface it instead of opening another.
+    var activationLock = EMS.Agent.Helpers.ActivationInstance.Acquire();
+    if (activationLock is null)
+    {
+        EMS.Agent.Helpers.ActivationInstance.BringToFront();
+        return;
+    }
+
     var loginBuilder = Host.CreateApplicationBuilder(args);
     loginBuilder.Services.AddAgentServices(loginBuilder.Configuration);
 
@@ -43,6 +52,8 @@ if (args.Contains("--login"))
     ApplicationConfiguration.Initialize();
     // Two-step activation: license key first, then employee sign-in.
     System.Windows.Forms.Application.Run(new LicenseActivationForm(licenseService, loginService));
+    // Hold the single-instance lock until the window closes (released on exit).
+    GC.KeepAlive(activationLock);
     return;
 }
 
