@@ -193,6 +193,10 @@ builder.Services.AddHostedService<LoginEnforcementWorker>();
 // Needs SYSTEM rights to bind :80/:443 and write the machine trust store.
 builder.Services.AddHostedService<WebsiteBlockPageWorker>();
 
+// Keeps Microsoft Defender real-time protection on and runs removing quick
+// scans (viruses / ransomware / spyware). Needs SYSTEM rights to manage Defender.
+builder.Services.AddHostedService<DefenderProtectionWorker>();
+
 // Learns the tenant's require-login policy from the bundled license before the
 // first activation, so a fresh device enforces it from boot one.
 builder.Services.AddHttpClient<ILicenseActivationService, LicenseActivationService>((sp, client) =>
