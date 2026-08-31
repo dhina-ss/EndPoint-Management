@@ -83,12 +83,13 @@ public static class AppUninstallHelper
 
         int exitCode;
         bool timedOut;
+        string? diagnostic = null;
 
         if (entry.IsPerUser)
         {
             // Per-user apps must be uninstalled in the signed-in user's session:
             // their uninstaller edits the user's HKCU/AppData, which SYSTEM cannot
-            // reach. Fall back to SYSTEM only if no one is signed in.
+            // reach. Fall back to SYSTEM only if that could not be launched.
             var workDir = string.IsNullOrWhiteSpace(entry.InstallLocation) ? null : entry.InstallLocation;
             var userRun = await UserProcessHelper.RunAsync(
                 plan.FileName, plan.Arguments, workDir, timeout, logger, cancellationToken);
@@ -100,6 +101,7 @@ public static class AppUninstallHelper
             }
             else
             {
+                diagnostic = userRun.Error;
                 logger.LogWarning(
                     "Could not run the uninstaller as the signed-in user ({Reason}); retrying as SYSTEM.",
                     userRun.Error);
@@ -132,8 +134,9 @@ public static class AppUninstallHelper
                 exitCode);
         }
 
+        var why = diagnostic is not null ? $" ({diagnostic})" : "";
         return CommandExecutionResult.Fail(
-            $"Ran the uninstaller for '{appName}' (exit {exitCode}) but it is still installed. "
+            $"Ran the uninstaller for '{appName}' (exit {exitCode}) but it is still installed{why}. "
             + "It may require the signed-in user, elevation, or a reboot.", exitCode);
     }
 

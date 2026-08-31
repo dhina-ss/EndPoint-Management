@@ -35,7 +35,18 @@ public static class ProcessRunner
         process.OutputDataReceived += (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); };
 
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (Exception ex)
+        {
+            // The executable is missing, access is denied (e.g. SYSTEM trying to
+            // start a per-user app), or the OS refused it. Never let this bubble
+            // up as an "unhandled error"; report it as a failed run so the caller
+            // can surface a clean message and (for uninstall) verify the result.
+            return new ProcessResult(false, -1, $"Could not start '{fileName}': {ex.Message}");
+        }
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 

@@ -52,7 +52,7 @@ public static class UserProcessHelper
             }
 
             // Best-effort: give the child the user's environment (PATH, %AppData%…).
-            CreateEnvironmentBlock(out envBlock, dupToken, false);
+            var hasEnv = CreateEnvironmentBlock(out envBlock, dupToken, false);
 
             var si = new STARTUPINFO();
             si.cb = Marshal.SizeOf(si);
@@ -65,11 +65,26 @@ public static class UserProcessHelper
                 commandLine.Append(' ').Append(arguments);
             }
 
-            const uint flags = CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
+            // CREATE_UNICODE_ENVIRONMENT is only valid with a non-null Unicode
+            // environment block; setting it with a null block makes
+            // CreateProcessAsUser fail. Only pass it when the block was built.
+            uint flags = CREATE_NO_WINDOW;
+            if (hasEnv && envBlock != IntPtr.Zero)
+            {
+                flags |= CREATE_UNICODE_ENVIRONMENT;
+            }
+
+            // Only pass a working directory that actually exists; a missing/odd
+            // one (trailing slash, removed folder) makes CreateProcessAsUser fail.
+            var workDir = workingDirectory?.Trim().TrimEnd('\\');
+            if (string.IsNullOrWhiteSpace(workDir) || !Directory.Exists(workDir))
+            {
+                workDir = null;
+            }
+
             var launched = CreateProcessAsUser(
-                dupToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, false, flags, envBlock,
-                string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory,
-                ref si, out var pi);
+                dupToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, false, flags,
+                envBlock == IntPtr.Zero ? IntPtr.Zero : envBlock, workDir, ref si, out var pi);
 
             if (!launched)
             {
