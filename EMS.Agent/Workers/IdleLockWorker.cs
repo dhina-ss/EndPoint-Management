@@ -114,6 +114,12 @@ public sealed class IdleLockWorker : BackgroundService
             return;
         }
 
+        // Still locked: re-send the lock beacon each tick so the server keeps the
+        // device shown as Sleep. Once the user unlocks we stop sending and the
+        // server's freshness window lets the status return to Online on its own.
+        // The server dedups the timeline entry, so this refresh adds no log spam.
+        await BeaconAsync(idleLock: true, cancellationToken);
+
         if (!_alerted && alertSeconds > 0
             && (DateTime.UtcNow - _autoLockedAtUtc).TotalSeconds >= alertSeconds)
         {
