@@ -42,12 +42,22 @@ public class AgentWorker : BackgroundService
             "The Lance Endpoint agent started. Server: {BaseUrl}, polling interval: {Interval} minutes.",
             _apiSettings.BaseUrl, _apiSettings.PollingIntervalMinutes);
 
+        var pendingInterval = TimeSpan.FromSeconds(Math.Clamp(_apiSettings.PendingRegistrationIntervalSeconds, 5, 300));
+        var normalInterval = TimeSpan.FromMinutes(Math.Max(1, _apiSettings.PollingIntervalMinutes));
+        var registered = false;
+
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await RunCycleAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromMinutes(_apiSettings.PollingIntervalMinutes), stoppingToken);
+                if (await RunCycleAsync(stoppingToken))
+                {
+                    registered = true;
+                }
+                // Until the device registers this run (dormant waiting for sign-in,
+                // or just activated), poll quickly so it appears within seconds of
+                // activation; afterwards use the normal inventory cadence.
+                await Task.Delay(registered ? normalInterval : pendingInterval, stoppingToken);
             }
         }
         catch (OperationCanceledException)
@@ -60,7 +70,10 @@ public class AgentWorker : BackgroundService
         }
     }
 
-    private async Task RunCycleAsync(CancellationToken stoppingToken)
+    /// <summary>Runs one inventory cycle. Returns true when the device was
+    /// successfully registered this cycle (used to switch off the fast startup
+    /// polling); false when dormant, not sent, or on error.</summary>
+    private async Task<bool> RunCycleAsync(CancellationToken stoppingToken)
     {
         try
         {
@@ -76,7 +89,7 @@ public class AgentWorker : BackgroundService
             if (!gate.IsMonitoringActive())
             {
                 _logger.LogInformation("Waiting for sign-in; The Lance Endpoint is dormant until a user activates this session.");
-                return;
+                return false;
             }
 
             var collector = scope.ServiceProvider.GetRequiredService<IDeviceCollectorService>();
@@ -120,6 +133,8 @@ public class AgentWorker : BackgroundService
                     _lastSecurityReport = DateTime.UtcNow;
                 }
             }
+
+            return sent;
         }
         catch (OperationCanceledException)
         {
@@ -130,6 +145,7 @@ public class AgentWorker : BackgroundService
             _logger.LogError(ex,
                 "Agent cycle failed; the agent keeps running, next attempt in {Interval} minutes.",
                 _apiSettings.PollingIntervalMinutes);
+            return false;
         }
     }
 

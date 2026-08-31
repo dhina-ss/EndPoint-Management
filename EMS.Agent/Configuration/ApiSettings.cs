@@ -28,8 +28,9 @@ public class ApiSettings
     /// <summary>Relative path of the heartbeat endpoint.</summary>
     public string HeartbeatEndpoint { get; set; } = "/api/devices/heartbeat";
 
-    /// <summary>How often the agent sends a liveness heartbeat, in seconds.</summary>
-    public int HeartbeatIntervalSeconds { get; set; } = 60;
+    /// <summary>How often the agent sends a liveness heartbeat, in seconds.
+    /// Short (5s) so online/offline and shutdown-duration are detected promptly.</summary>
+    public int HeartbeatIntervalSeconds { get; set; } = 5;
 
     /// <summary>HTTP request timeout in seconds.</summary>
     public int TimeoutSeconds { get; set; } = 30;
@@ -42,6 +43,15 @@ public class ApiSettings
 
     /// <summary>How often the agent collects and reports inventory, in minutes.</summary>
     public int PollingIntervalMinutes { get; set; } = 10;
+
+    /// <summary>
+    /// While the device has not yet registered this run (e.g. dormant waiting for
+    /// sign-in, or just activated), the inventory loop polls on this short
+    /// interval instead of the full PollingIntervalMinutes, so the device appears
+    /// within seconds of activation rather than up to a poll-interval later. Once
+    /// the first registration succeeds it switches to the normal cadence.
+    /// </summary>
+    public int PendingRegistrationIntervalSeconds { get; set; } = 20;
 
     /// <summary>
     /// How often the agent re-scans and reports the installed-application list,
