@@ -28,7 +28,7 @@
          the installer reads it back off the compiled exe (see EMS.Agent.iss),
          so bumping it here is the only place a release version changes. Override
          at build time with -p:Version=x.y.z if needed. -->
-    <Version>1.0.23</Version>
+    <Version>1.0.24</Version>
   </PropertyGroup>
 
   <!-- Branding assets loaded at runtime for the tray icon and activation window. -->

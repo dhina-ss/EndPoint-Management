@@ -21,6 +21,11 @@ public class AgentWorker : BackgroundService
     // first cycle after startup; thereafter it runs on its own hourly cadence.
     private DateTime? _lastInstalledAppsReport;
 
+    // When Defender status was last SUCCESSFULLY reported. Null forces a report
+    // on the first cycle; a failed report leaves it null so the next cycle
+    // retries. After the first success it runs on its own ~2-hour cadence.
+    private DateTime? _lastSecurityReport;
+
     public AgentWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<ApiSettings> apiSettings,
@@ -105,8 +110,16 @@ public class AgentWorker : BackgroundService
                 }
             }
 
-            // Microsoft Defender status + threat history (read-only).
-            await ReportSecurityStatusAsync(apiClient, stoppingToken);
+            // Microsoft Defender status + threat history (read-only). Runs on its
+            // own ~2-hour cadence (first cycle immediately; retried each cycle
+            // until the first success).
+            if (ShouldReportSecurityStatus())
+            {
+                if (await ReportSecurityStatusAsync(apiClient, stoppingToken))
+                {
+                    _lastSecurityReport = DateTime.UtcNow;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -121,25 +134,51 @@ public class AgentWorker : BackgroundService
     }
 
     /// <summary>
-    /// Reads Microsoft Defender status + threat history and reports it. Isolated
-    /// so a failure never affects the rest of the cycle; best-effort.
+    /// True on the first cycle, then once the Defender-status interval has
+    /// elapsed since the last SUCCESSFUL report (a failure leaves the timestamp
+    /// null so the next cycle retries promptly).
     /// </summary>
-    private async Task ReportSecurityStatusAsync(IApiClientService apiClient, CancellationToken stoppingToken)
+    private bool ShouldReportSecurityStatus()
+    {
+        if (_lastSecurityReport is null)
+        {
+            return true;
+        }
+
+        var interval = TimeSpan.FromMinutes(Math.Max(1, _apiSettings.DefenderStatusIntervalMinutes));
+        return DateTime.UtcNow - _lastSecurityReport.Value >= interval;
+    }
+
+    /// <summary>
+    /// Reads Microsoft Defender status + threat history and reports it. Isolated
+    /// so a failure never affects the rest of the cycle. Returns true only when
+    /// the status was successfully reported.
+    /// </summary>
+    private async Task<bool> ReportSecurityStatusAsync(IApiClientService apiClient, CancellationToken stoppingToken)
     {
         try
         {
             var status = await DefenderStatusHelper.ReadAsync(
-                _logger, TimeSpan.FromSeconds(60), stoppingToken);
+                _logger, TimeSpan.FromSeconds(90), stoppingToken);
             if (status is null)
             {
-                return; // Defender unavailable (third-party AV, etc.).
+                // Could not read Defender (unavailable, third-party AV, or a
+                // transient PowerShell error). Logged as a warning so the reason
+                // is visible; the next cycle retries.
+                _logger.LogWarning("Defender status was unavailable this cycle; will retry next cycle.");
+                return false;
             }
 
             if (await apiClient.SendSecurityStatusAsync(status, stoppingToken))
             {
                 _logger.LogInformation(
-                    "Reported Defender status ({ThreatCount} threat(s)).", status.Threats.Count);
+                    "Reported Defender status (realtime={Realtime}, av={Av}, {ThreatCount} threat(s)).",
+                    status.RealtimeProtectionEnabled, status.AntivirusEnabled, status.Threats.Count);
+                return true;
             }
+
+            _logger.LogWarning("Defender status read but the server rejected the report; will retry next cycle.");
+            return false;
         }
         catch (OperationCanceledException)
         {
@@ -148,6 +187,7 @@ public class AgentWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Defender status report failed for this cycle.");
+            return false;
         }
     }
 

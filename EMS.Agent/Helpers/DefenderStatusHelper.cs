@@ -17,6 +17,9 @@ public static class DefenderStatusHelper
     // Gathers status + threats and emits a single compact JSON object.
     private const string Script = @"
 $ErrorActionPreference='SilentlyContinue'
+# Ensure the Defender module is available even when it is not auto-loaded in
+# the SYSTEM service's restricted environment.
+Import-Module Defender -ErrorAction SilentlyContinue
 $s = Get-MpComputerStatus
 if (-not $s) { Write-Output '{}'; exit }
 $defs=@{}; Get-MpThreat | ForEach-Object { $defs[[string]$_.ThreatID]=$_ }
@@ -58,8 +61,15 @@ foreach ($d in (Get-MpThreatDetection)) {
                 $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}",
                 timeout, cancellationToken);
 
-            if (result.TimedOut || string.IsNullOrWhiteSpace(result.Output))
+            if (result.TimedOut)
             {
+                logger.LogWarning("Reading Microsoft Defender status timed out.");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.Output))
+            {
+                logger.LogWarning("Microsoft Defender status query returned no output.");
                 return null;
             }
 
@@ -67,18 +77,28 @@ foreach ($d in (Get-MpThreatDetection)) {
             var start = json.IndexOf('{');
             if (start < 0)
             {
+                logger.LogWarning("Microsoft Defender status output was not JSON: {Output}",
+                    Truncate(json, 300));
                 return null;
             }
             json = json[start..];
 
             var status = JsonSerializer.Deserialize<SecurityStatusModel>(json, JsonOptions);
             // An empty object (Defender absent) deserializes to all-null; treat as unavailable.
-            return status is { RealtimeProtectionEnabled: null, AntivirusEnabled: null } ? null : status;
+            if (status is null or { RealtimeProtectionEnabled: null, AntivirusEnabled: null })
+            {
+                logger.LogWarning("Microsoft Defender reported no status (may be absent or a third-party AV is active).");
+                return null;
+            }
+            return status;
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "Could not read Microsoft Defender status.");
+            logger.LogWarning(ex, "Could not read Microsoft Defender status.");
             return null;
         }
     }
+
+    private static string Truncate(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 }

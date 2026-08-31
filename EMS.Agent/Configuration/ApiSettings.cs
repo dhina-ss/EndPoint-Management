@@ -50,6 +50,15 @@ public class ApiSettings
     /// </summary>
     public int InstalledAppsIntervalMinutes { get; set; } = 60;
 
+    /// <summary>
+    /// How often the agent reads and reports Microsoft Defender status + threat
+    /// history, in minutes. Protection state changes rarely, so this runs on its
+    /// own slow cadence (default every 2 hours) rather than every inventory cycle.
+    /// It still reports on the first cycle after activation so the dashboard is
+    /// populated promptly, and retries every cycle until the first success.
+    /// </summary>
+    public int DefenderStatusIntervalMinutes { get; set; } = 120;
+
     /// <summary>Relative path of the app-usage report endpoint.</summary>
     public string AppUsageEndpoint { get; set; } = "/api/devices/app-usage";
 
