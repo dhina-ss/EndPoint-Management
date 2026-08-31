@@ -40,6 +40,15 @@ public interface IApiClientService
     /// </summary>
     Task SendPowerStateAsync(bool suspended, CancellationToken cancellationToken = default);
 
+    /// <summary>Best-effort beacon that the workstation was auto-locked after inactivity.</summary>
+    Task SendIdleLockAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Best-effort beacon that the device stayed locked past the alert window; the
+    /// server emails the assigned manager. Fire-and-forget.
+    /// </summary>
+    Task SendIdleAlertAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Reports a precise GPS location fix. Best-effort.</summary>
     Task SendLocationAsync(double latitude, double longitude, double accuracyMeters,
         CancellationToken cancellationToken = default);
@@ -86,8 +95,10 @@ public sealed record HeartbeatOutcome(
     bool UsbBlockingEnabled,
     bool StoreGatingEnabled,
     IReadOnlyList<string> BlockedWebsites,
-    bool RequireLoginEachStartup)
+    bool RequireLoginEachStartup,
+    int InactivityLockSeconds,
+    int InactivityAlertSeconds)
 {
     public static readonly HeartbeatOutcome Failed =
-        new(false, false, false, Array.Empty<string>(), false);
+        new(false, false, false, Array.Empty<string>(), false, 0, 0);
 }

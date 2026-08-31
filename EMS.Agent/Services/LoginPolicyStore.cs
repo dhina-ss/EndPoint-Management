@@ -25,10 +25,17 @@ public class LoginPolicyStore : ILoginPolicyStore
 
     public bool RequireLoginEachStartup() => ReadDocument()?.RequireLoginEachStartup ?? false;
 
-    public void Set(bool requireLoginEachStartup)
+    public int InactivityLockSeconds() => ReadDocument()?.InactivityLockSeconds ?? 0;
+
+    public int InactivityAlertSeconds() => ReadDocument()?.InactivityAlertSeconds ?? 0;
+
+    public void Set(bool requireLoginEachStartup, int inactivityLockSeconds, int inactivityAlertSeconds)
     {
         // Avoid rewriting (and churning the file ACL) when nothing changed.
-        if (ReadDocument()?.RequireLoginEachStartup == requireLoginEachStartup)
+        var current = ReadDocument();
+        if (current?.RequireLoginEachStartup == requireLoginEachStartup
+            && current?.InactivityLockSeconds == inactivityLockSeconds
+            && current?.InactivityAlertSeconds == inactivityAlertSeconds)
         {
             return;
         }
@@ -40,11 +47,15 @@ public class LoginPolicyStore : ILoginPolicyStore
             var document = new LoginPolicyDocument
             {
                 RequireLoginEachStartup = requireLoginEachStartup,
+                InactivityLockSeconds = inactivityLockSeconds,
+                InactivityAlertSeconds = inactivityAlertSeconds,
                 UpdatedAt = DateTime.UtcNow
             };
 
             UserWritableFile.WriteAllText(_filePath, JsonSerializer.Serialize(document, SerializerOptions));
-            _logger.LogInformation("Login policy updated: requireLoginEachStartup={Value}.", requireLoginEachStartup);
+            _logger.LogInformation(
+                "Login policy updated: requireLoginEachStartup={Value}, inactivityLock={Lock}s, inactivityAlert={Alert}s.",
+                requireLoginEachStartup, inactivityLockSeconds, inactivityAlertSeconds);
         }
         catch (Exception ex)
         {
@@ -77,6 +88,10 @@ public class LoginPolicyStore : ILoginPolicyStore
     private sealed class LoginPolicyDocument
     {
         public bool RequireLoginEachStartup { get; set; }
+
+        public int InactivityLockSeconds { get; set; }
+
+        public int InactivityAlertSeconds { get; set; }
 
         public DateTime UpdatedAt { get; set; }
     }

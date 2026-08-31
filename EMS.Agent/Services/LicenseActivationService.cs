@@ -63,8 +63,12 @@ public class LicenseActivationService : ILicenseActivationService
             }
 
             // Remember the tenant's "require sign-in each startup" policy so the
-            // agent can enforce it even before the first activation.
-            _loginPolicyStore.Set(result.RequireLoginEachStartup);
+            // agent can enforce it even before the first activation. Preserve any
+            // inactivity settings already learned from a heartbeat.
+            _loginPolicyStore.Set(
+                result.RequireLoginEachStartup,
+                _loginPolicyStore.InactivityLockSeconds(),
+                _loginPolicyStore.InactivityAlertSeconds());
 
             return new LicenseValidationResult(true, "License verified.", result.TenantId, result.TenantName);
         }

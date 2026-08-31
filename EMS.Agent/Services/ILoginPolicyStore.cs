@@ -11,6 +11,17 @@ public interface ILoginPolicyStore
     /// <summary>True when the user must sign in on every device startup.</summary>
     bool RequireLoginEachStartup();
 
-    /// <summary>Persists the latest policy value received from the server.</summary>
-    void Set(bool requireLoginEachStartup);
+    /// <summary>
+    /// Idle seconds before the workstation is auto-locked; 0 (or less) disables
+    /// auto-lock. Set by the tenant admin, delivered via heartbeat.
+    /// </summary>
+    int InactivityLockSeconds();
+
+    /// <summary>
+    /// Additional idle seconds after the auto-lock before the manager is emailed.
+    /// </summary>
+    int InactivityAlertSeconds();
+
+    /// <summary>Persists the latest policy values received from the server.</summary>
+    void Set(bool requireLoginEachStartup, int inactivityLockSeconds, int inactivityAlertSeconds);
 }

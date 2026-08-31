@@ -65,6 +65,12 @@ public class ApiSettings
     /// <summary>Relative path of the power-state (sleep) beacon endpoint.</summary>
     public string PowerStateEndpoint { get; set; } = "/api/devices/power-state";
 
+    /// <summary>Relative path of the inactivity auto-lock beacon endpoint.</summary>
+    public string IdleLockEndpoint { get; set; } = "/api/devices/idle-lock";
+
+    /// <summary>Relative path of the prolonged-inactivity manager-alert endpoint.</summary>
+    public string IdleAlertEndpoint { get; set; } = "/api/devices/idle-alert";
+
     /// <summary>Relative path of the GPS location report endpoint.</summary>
     public string LocationEndpoint { get; set; } = "/api/devices/location";
 

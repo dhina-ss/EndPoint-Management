@@ -52,9 +52,12 @@ public class HeartbeatService : IHeartbeatService
 
             ApplyStorePolicy(outcome.StoreGatingEnabled);
 
-            // Persist the sign-in policy so the per-user tracker/login window
-            // (separate processes) can act on it at the next startup.
-            _loginPolicyStore.Set(outcome.RequireLoginEachStartup);
+            // Persist the sign-in + inactivity policy so the per-user tracker/
+            // login window (separate processes) can act on it.
+            _loginPolicyStore.Set(
+                outcome.RequireLoginEachStartup,
+                outcome.InactivityLockSeconds,
+                outcome.InactivityAlertSeconds);
         }
 
         return outcome.Success;

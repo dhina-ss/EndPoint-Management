@@ -134,7 +134,9 @@ public class ApiClientService : IApiClientService
                     result?.UsbBlockingEnabled ?? false,
                     result?.StoreGatingEnabled ?? false,
                     result?.BlockedWebsites ?? Array.Empty<string>(),
-                    result?.RequireLoginEachStartup ?? false);
+                    result?.RequireLoginEachStartup ?? false,
+                    result?.InactivityLockSeconds ?? 0,
+                    result?.InactivityAlertSeconds ?? 0);
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -282,6 +284,41 @@ public class ApiClientService : IApiClientService
         {
             // Best-effort: the machine may suspend mid-request.
             _logger.LogDebug(ex, "Power-state beacon could not be delivered.");
+        }
+    }
+
+    public Task SendIdleLockAsync(CancellationToken cancellationToken = default) =>
+        SendDeviceBeaconAsync(_settings.IdleLockEndpoint, "idle-lock", cancellationToken);
+
+    public Task SendIdleAlertAsync(CancellationToken cancellationToken = default) =>
+        SendDeviceBeaconAsync(_settings.IdleAlertEndpoint, "idle-alert", cancellationToken);
+
+    /// <summary>Shared plumbing for the fire-and-forget device-token beacons.</summary>
+    private async Task SendDeviceBeaconAsync(string endpoint, string label, CancellationToken cancellationToken)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = JsonContent.Create(new { })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            _logger.LogDebug("{Label} beacon sent: {Status}.", label, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "{Label} beacon could not be delivered.", label);
         }
     }
 
@@ -663,5 +700,6 @@ public class ApiClientService : IApiClientService
     /// <summary>Shape of the EMS.API heartbeat response.</summary>
     private sealed record HeartbeatResult(
         bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
-        bool StoreGatingEnabled, IReadOnlyList<string>? BlockedWebsites, bool RequireLoginEachStartup);
+        bool StoreGatingEnabled, IReadOnlyList<string>? BlockedWebsites, bool RequireLoginEachStartup,
+        int InactivityLockSeconds, int InactivityAlertSeconds);
 }
