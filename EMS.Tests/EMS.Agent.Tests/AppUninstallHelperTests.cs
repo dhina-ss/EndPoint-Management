@@ -67,7 +67,9 @@ public class AppUninstallHelperTests
     public void PlanUninstall_WinRarStyleExe_AppendsSilentSwitch()
     {
         // WinRAR: no MSI code, no QuietUninstallString, bare uninstall.exe. We
-        // must run it WITH /S (never bare, which hangs in Session 0).
+        // must run it WITH /S (never bare, which hangs in Session 0), plus the
+        // NSIS "_?=<dir>" so it runs synchronously in place. Dir falls back to
+        // the uninstaller's own folder when InstallLocation is absent.
         var entry = new AppUninstallHelper.UninstallEntry(
             "WinRAR 7.13 (64-bit)", "7.13.0", "WinRAR archiver",
             "C:\\Program Files\\WinRAR\\uninstall.exe", null);
@@ -77,7 +79,27 @@ public class AppUninstallHelperTests
         Assert.Null(reason);
         Assert.NotNull(plan);
         Assert.Equal("C:\\Program Files\\WinRAR\\uninstall.exe", plan!.FileName);
-        Assert.Equal("/S", plan.Arguments);
+        Assert.Equal("/S _?=C:\\Program Files\\WinRAR", plan.Arguments);
+    }
+
+    [Fact]
+    public void PlanUninstall_NsisExe_UsesInstallLocationForSyncFlag()
+    {
+        // When InstallLocation is present it is preferred over the uninstaller's
+        // folder for the "_?=" directory.
+        var entry = new AppUninstallHelper.UninstallEntry(
+            "BitTorrent", "7.11.0.47255", "BitTorrent",
+            "C:\\Users\\jc\\AppData\\Roaming\\BitTorrent\\uninstall.exe", null)
+        {
+            InstallLocation = "C:\\Users\\jc\\AppData\\Roaming\\BitTorrent\\",
+            IsPerUser = true,
+        };
+
+        var (plan, reason) = AppUninstallHelper.PlanUninstall(entry);
+
+        Assert.Null(reason);
+        Assert.NotNull(plan);
+        Assert.Equal("/S _?=C:\\Users\\jc\\AppData\\Roaming\\BitTorrent", plan!.Arguments);
     }
 
     [Fact]

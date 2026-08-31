@@ -11,6 +11,12 @@ namespace EMS.Agent.Helpers;
 /// an MSI product code (msiexec /x /qn) or a QuietUninstallString. An app whose
 /// only uninstaller is interactive is reported as a failure rather than run,
 /// since it would hang with no one to click through it.
+///
+/// Per-user apps (entries under HKU\SID) are launched in the signed-in user's
+/// session via <see cref="UserProcessHelper"/> so their uninstaller edits the
+/// right HKCU/AppData. NSIS uninstallers are run synchronously (see the "_?="
+/// note in PlanUninstall), and every uninstall is confirmed by re-scanning the
+/// registry - success is reported only when the app is actually gone.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public static class AppUninstallHelper
@@ -33,7 +39,14 @@ public static class AppUninstallHelper
     /// <summary>One app's uninstall-relevant registry values.</summary>
     public sealed record UninstallEntry(
         string DisplayName, string? DisplayVersion, string KeyName,
-        string? UninstallString, string? QuietUninstallString);
+        string? UninstallString, string? QuietUninstallString)
+    {
+        /// <summary>InstallLocation registry value, when present.</summary>
+        public string? InstallLocation { get; init; }
+
+        /// <summary>True when the entry lives in a per-user hive (HKU\SID), not HKLM.</summary>
+        public bool IsPerUser { get; init; }
+    }
 
     /// <summary>The concrete process to run for a silent uninstall.</summary>
     public sealed record UninstallPlan(string FileName, string Arguments);
@@ -65,25 +78,63 @@ public static class AppUninstallHelper
             return CommandExecutionResult.Fail(failureReason ?? "No silent uninstall method is available.");
         }
 
-        logger.LogInformation("Uninstalling '{App}' via: {File} {Args}", appName, plan.FileName, plan.Arguments);
-        var result = await ProcessRunner.RunAsync(plan.FileName, plan.Arguments, timeout, cancellationToken);
+        logger.LogInformation("Uninstalling '{App}' (perUser={PerUser}) via: {File} {Args}",
+            appName, entry.IsPerUser, plan.FileName, plan.Arguments);
 
-        if (result.TimedOut)
+        int exitCode;
+        bool timedOut;
+
+        if (entry.IsPerUser)
         {
-            return CommandExecutionResult.Fail(
-                $"Uninstall of '{appName}' timed out (it may have shown a prompt).", result.ExitCode);
+            // Per-user apps must be uninstalled in the signed-in user's session:
+            // their uninstaller edits the user's HKCU/AppData, which SYSTEM cannot
+            // reach. Fall back to SYSTEM only if no one is signed in.
+            var workDir = string.IsNullOrWhiteSpace(entry.InstallLocation) ? null : entry.InstallLocation;
+            var userRun = await UserProcessHelper.RunAsync(
+                plan.FileName, plan.Arguments, workDir, timeout, logger, cancellationToken);
+
+            if (userRun.Launched)
+            {
+                exitCode = userRun.ExitCode;
+                timedOut = userRun.TimedOut;
+            }
+            else
+            {
+                logger.LogWarning(
+                    "Could not run the uninstaller as the signed-in user ({Reason}); retrying as SYSTEM.",
+                    userRun.Error);
+                var sys = await ProcessRunner.RunAsync(plan.FileName, plan.Arguments, timeout, cancellationToken);
+                exitCode = sys.ExitCode;
+                timedOut = sys.TimedOut;
+            }
+        }
+        else
+        {
+            var result = await ProcessRunner.RunAsync(plan.FileName, plan.Arguments, timeout, cancellationToken);
+            exitCode = result.ExitCode;
+            timedOut = result.TimedOut;
         }
 
-        // 0 = success; 3010 = success, reboot required (common for MSI).
-        if (result.ExitCode is 0 or 3010)
+        if (timedOut)
+        {
+            return CommandExecutionResult.Fail(
+                $"Uninstall of '{appName}' timed out (it may have shown a prompt).", exitCode);
+        }
+
+        // Trust removal, not the exit code: some uninstallers relaunch a copy and
+        // return 0 immediately, or no-op yet still exit 0. Give it a moment, then
+        // confirm the app is actually gone from the registry before reporting OK.
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        if (FindDesktopEntry(appName, version, logger) is null)
         {
             return CommandExecutionResult.Ok(
-                $"Uninstalled '{appName}'." + (result.ExitCode == 3010 ? " A reboot is required." : ""),
-                result.ExitCode);
+                $"Uninstalled '{appName}'." + (exitCode == 3010 ? " A reboot is required." : ""),
+                exitCode);
         }
 
         return CommandExecutionResult.Fail(
-            $"Uninstaller for '{appName}' exited with code {result.ExitCode}.", result.ExitCode);
+            $"Ran the uninstaller for '{appName}' (exit {exitCode}) but it is still installed. "
+            + "It may require the signed-in user, elevation, or a reboot.", exitCode);
     }
 
     /// <summary>
@@ -122,6 +173,23 @@ public static class AppUninstallHelper
             {
                 var silent = GuessSilentSwitch(file);
                 var args = string.IsNullOrWhiteSpace(existingArgs) ? silent : $"{existingArgs} {silent}";
+
+                // NSIS ("/S") copies itself to %TEMP% and relaunches async, so the
+                // original process exits 0 before anything is removed. The magic
+                // "_?=<dir>" parameter forces it to run in place and synchronously,
+                // so the exit / registry state is meaningful. Must be last and
+                // unquoted even when the path has spaces.
+                if (silent == "/S")
+                {
+                    var dir = !string.IsNullOrWhiteSpace(entry.InstallLocation)
+                        ? entry.InstallLocation!.Trim().TrimEnd('\\')
+                        : Path.GetDirectoryName(file);
+                    if (!string.IsNullOrWhiteSpace(dir))
+                    {
+                        args = $"{args} _?={dir}";
+                    }
+                }
+
                 return (new UninstallPlan(file, args), null);
             }
         }
@@ -244,10 +312,10 @@ public static class AppUninstallHelper
     {
         // Machine-wide (both registry views) then per-user hives, mirroring the
         // enumeration InstalledAppsHelper uses for the inventory scan.
-        var roots = new List<(RegistryKey root, string path)>
+        var roots = new List<(RegistryKey root, string path, bool perUser)>
         {
-            (Registry.LocalMachine, UninstallSubKey),
-            (Registry.LocalMachine, UninstallSubKeyWow)
+            (Registry.LocalMachine, UninstallSubKey, false),
+            (Registry.LocalMachine, UninstallSubKeyWow, false)
         };
 
         try
@@ -263,7 +331,8 @@ public static class AppUninstallHelper
                 var userHive = Registry.Users.OpenSubKey(sid);
                 if (userHive is not null)
                 {
-                    roots.Add((userHive, UninstallSubKey));
+                    roots.Add((userHive, UninstallSubKey, true));
+                    roots.Add((userHive, UninstallSubKeyWow, true));
                 }
             }
         }
@@ -274,7 +343,7 @@ public static class AppUninstallHelper
 
         UninstallEntry? versionlessMatch = null;
 
-        foreach (var (root, path) in roots)
+        foreach (var (root, path, perUser) in roots)
         {
             try
             {
@@ -299,7 +368,11 @@ public static class AppUninstallHelper
                         (entryKey!.GetValue("DisplayVersion") as string)?.Trim(),
                         keyName,
                         entryKey.GetValue("UninstallString") as string,
-                        entryKey.GetValue("QuietUninstallString") as string);
+                        entryKey.GetValue("QuietUninstallString") as string)
+                    {
+                        InstallLocation = (entryKey.GetValue("InstallLocation") as string)?.Trim(),
+                        IsPerUser = perUser,
+                    };
 
                     // Prefer an exact name+version match; fall back to name-only.
                     if (!string.IsNullOrWhiteSpace(version) &&
