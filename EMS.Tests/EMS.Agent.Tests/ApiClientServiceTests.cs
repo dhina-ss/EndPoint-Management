@@ -179,6 +179,21 @@ public class ApiClientServiceTests
         Assert.True(result.UsbBlockingEnabled);
     }
 
+    [Fact]
+    public async Task SendHeartbeatAsync_ReturnsUpdateInfoFromServer()
+    {
+        await _tokenService.SaveTokenAsync(TestDeviceId, "token-abc");
+        var handler = new SequenceHandler(JsonResponse(HttpStatusCode.OK,
+            """{"success":true,"message":"Heartbeat received","serverTime":"2026-07-19T10:30:00Z","latestAgentVersion":"1.0.28","updateDownloadUrl":"/api/agent/update/download","updateSha256":"abc123"}"""));
+
+        var result = await CreateService(handler).SendHeartbeatAsync(new HeartbeatModel());
+
+        Assert.True(result.Success);
+        Assert.Equal("1.0.28", result.LatestAgentVersion);
+        Assert.Equal("/api/agent/update/download", result.UpdateDownloadUrl);
+        Assert.Equal("abc123", result.UpdateSha256);
+    }
+
     private sealed class InMemoryTokenService : IDeviceTokenService
     {
         private string? _token;

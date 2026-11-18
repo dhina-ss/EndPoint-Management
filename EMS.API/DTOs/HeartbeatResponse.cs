@@ -34,4 +34,19 @@ public class HeartbeatResponse
     /// them to the hosts file after each heartbeat.
     /// </summary>
     public IReadOnlyList<string> BlockedWebsites { get; set; } = [];
+
+    /// <summary>
+    /// If an agent update is available, the latest agent version string (e.g. "1.0.28").
+    /// </summary>
+    public string? LatestAgentVersion { get; set; }
+
+    /// <summary>
+    /// Relative or absolute URL where the update installer binary can be downloaded.
+    /// </summary>
+    public string? UpdateDownloadUrl { get; set; }
+
+    /// <summary>
+    /// Expected SHA-256 hash of the installer for verification before running.
+    /// </summary>
+    public string? UpdateSha256 { get; set; }
 }

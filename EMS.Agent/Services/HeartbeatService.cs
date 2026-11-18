@@ -18,6 +18,7 @@ public class HeartbeatService : IHeartbeatService
     private readonly ISystemMetricsService _metricsService;
     private readonly IStoreUnlockStore _storeUnlockStore;
     private readonly ILoginPolicyStore _loginPolicyStore;
+    private readonly IAutoUpdateService _autoUpdateService;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
@@ -25,12 +26,14 @@ public class HeartbeatService : IHeartbeatService
         ISystemMetricsService metricsService,
         IStoreUnlockStore storeUnlockStore,
         ILoginPolicyStore loginPolicyStore,
+        IAutoUpdateService autoUpdateService,
         ILogger<HeartbeatService> logger)
     {
         _apiClient = apiClient;
         _metricsService = metricsService;
         _storeUnlockStore = storeUnlockStore;
         _loginPolicyStore = loginPolicyStore;
+        _autoUpdateService = autoUpdateService;
         _logger = logger;
     }
 
@@ -58,6 +61,16 @@ public class HeartbeatService : IHeartbeatService
                 outcome.RequireLoginEachStartup,
                 outcome.InactivityLockSeconds,
                 outcome.InactivityAlertSeconds);
+
+            // Auto-update: check if a newer version is available and trigger detached update
+            if (!string.IsNullOrWhiteSpace(outcome.LatestAgentVersion) &&
+                !string.IsNullOrWhiteSpace(outcome.UpdateDownloadUrl))
+            {
+                _autoUpdateService.CheckAndTriggerUpdate(
+                    outcome.LatestAgentVersion,
+                    outcome.UpdateDownloadUrl,
+                    outcome.UpdateSha256);
+            }
         }
 
         return outcome.Success;

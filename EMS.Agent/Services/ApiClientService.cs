@@ -136,7 +136,10 @@ public class ApiClientService : IApiClientService
                     result?.BlockedWebsites ?? Array.Empty<string>(),
                     result?.RequireLoginEachStartup ?? false,
                     result?.InactivityLockSeconds ?? 0,
-                    result?.InactivityAlertSeconds ?? 0);
+                    result?.InactivityAlertSeconds ?? 0,
+                    result?.LatestAgentVersion,
+                    result?.UpdateDownloadUrl,
+                    result?.UpdateSha256);
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -609,6 +612,74 @@ public class ApiClientService : IApiClientService
         }
     }
 
+    public async Task<bool> DownloadFileAsync(
+        string downloadUrl, string destinationPath, string? expectedSha256 = null, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            var uri = Uri.IsWellFormedUriString(downloadUrl, UriKind.Absolute)
+                ? new Uri(downloadUrl)
+                : new Uri(_httpClient.BaseAddress ?? new Uri("http://localhost"), downloadUrl);
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (!string.IsNullOrEmpty(deviceId))
+            {
+                request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            }
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Add(DeviceAuthHeaders.Token, token);
+            }
+
+            using var response = await _httpClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Download failed with status {StatusCode} from {Url}.", (int)response.StatusCode, downloadUrl);
+                return false;
+            }
+
+            var dir = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            await using (var httpStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var fileStream = File.Create(destinationPath))
+            {
+                await httpStream.CopyToAsync(fileStream, cancellationToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(expectedSha256))
+            {
+                await using var verifyStream = File.OpenRead(destinationPath);
+                var actual = Convert.ToHexString(
+                    await SHA256.HashDataAsync(verifyStream, cancellationToken)).ToLowerInvariant();
+
+                if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Downloaded file SHA-256 mismatch (expected {Expected}, got {Actual}).",
+                        expectedSha256, actual);
+                    TryDelete(destinationPath);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            _logger.LogWarning(ex, "Failed to download update from {Url}.", downloadUrl);
+            TryDelete(destinationPath);
+            return false;
+        }
+    }
+
     private static void TryDelete(string path)
     {
         try
@@ -701,5 +772,6 @@ public class ApiClientService : IApiClientService
     private sealed record HeartbeatResult(
         bool Success, string? Message, DateTime? ServerTime, bool UsbBlockingEnabled,
         bool StoreGatingEnabled, IReadOnlyList<string>? BlockedWebsites, bool RequireLoginEachStartup,
-        int InactivityLockSeconds, int InactivityAlertSeconds);
+        int InactivityLockSeconds, int InactivityAlertSeconds,
+        string? LatestAgentVersion, string? UpdateDownloadUrl, string? UpdateSha256);
 }

@@ -25,6 +25,8 @@ if (!string.IsNullOrEmpty(cloudPort) && string.IsNullOrEmpty(Environment.GetEnvi
 // Configuration
 builder.Services.Configure<DatabaseSettings>(
     builder.Configuration.GetSection(DatabaseSettings.SectionName));
+builder.Services.Configure<AgentUpdateSettings>(
+    builder.Configuration.GetSection(AgentUpdateSettings.SectionName));
 
 var databaseSettings = builder.Configuration
     .GetSection(DatabaseSettings.SectionName)
@@ -74,6 +76,7 @@ builder.Services.AddScoped<IInstallerPackageService, InstallerPackageService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
 builder.Services.AddScoped<ISecurityStatusService, SecurityStatusService>();
+builder.Services.AddSingleton<IAgentUpdateService, AgentUpdateService>();
 
 // City-level geolocation from a device's public IP (ip-api.com) and reverse
 // geocoding of GPS fixes (Nominatim, which requires an identifying User-Agent).

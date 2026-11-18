@@ -84,6 +84,13 @@ public interface IApiClientService
     /// </summary>
     Task<string?> DownloadPackageAsync(
         Guid packageId, string? expectedSha256, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads a remote file (such as an auto-update installer) to a destination path,
+    /// optionally verifying its SHA-256 hash. Returns true on success.
+    /// </summary>
+    Task<bool> DownloadFileAsync(
+        string downloadUrl, string destinationPath, string? expectedSha256 = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -97,7 +104,10 @@ public sealed record HeartbeatOutcome(
     IReadOnlyList<string> BlockedWebsites,
     bool RequireLoginEachStartup,
     int InactivityLockSeconds,
-    int InactivityAlertSeconds)
+    int InactivityAlertSeconds,
+    string? LatestAgentVersion = null,
+    string? UpdateDownloadUrl = null,
+    string? UpdateSha256 = null)
 {
     public static readonly HeartbeatOutcome Failed =
         new(false, false, false, Array.Empty<string>(), false, 0, 0);

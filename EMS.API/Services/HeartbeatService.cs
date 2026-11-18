@@ -11,6 +11,7 @@ public class HeartbeatService : IHeartbeatService
     private readonly IBlockedWebsiteRepository _blockedWebsiteRepository;
     private readonly INetworkUsageRepository _networkUsageRepository;
     private readonly IGeoLocationService _geoLocationService;
+    private readonly IAgentUpdateService _agentUpdateService;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(
@@ -19,6 +20,7 @@ public class HeartbeatService : IHeartbeatService
         IBlockedWebsiteRepository blockedWebsiteRepository,
         INetworkUsageRepository networkUsageRepository,
         IGeoLocationService geoLocationService,
+        IAgentUpdateService agentUpdateService,
         ILogger<HeartbeatService> logger)
     {
         _deviceRepository = deviceRepository;
@@ -26,6 +28,7 @@ public class HeartbeatService : IHeartbeatService
         _blockedWebsiteRepository = blockedWebsiteRepository;
         _networkUsageRepository = networkUsageRepository;
         _geoLocationService = geoLocationService;
+        _agentUpdateService = agentUpdateService;
         _logger = logger;
     }
 
@@ -86,6 +89,7 @@ public class HeartbeatService : IHeartbeatService
         await _heartbeatRepository.SaveChangesAsync(cancellationToken);
 
         var blockedWebsites = await _blockedWebsiteRepository.GetByDeviceAsync(device.Id, cancellationToken);
+        var updateInfo = _agentUpdateService.GetUpdateInfo();
 
         return new HeartbeatResponse
         {
@@ -95,7 +99,10 @@ public class HeartbeatService : IHeartbeatService
             UsbBlockingEnabled = device.UsbBlockingEnabled,
             StoreGatingEnabled = device.StoreGatingEnabled,
             RequireLoginEachStartup = device.RequireLoginEachStartup,
-            BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList()
+            BlockedWebsites = blockedWebsites.Select(b => b.Domain).ToList(),
+            LatestAgentVersion = updateInfo.Enabled ? updateInfo.LatestVersion : null,
+            UpdateDownloadUrl = updateInfo.Enabled ? updateInfo.DownloadUrl : null,
+            UpdateSha256 = updateInfo.Enabled ? updateInfo.Sha256 : null
         };
     }
 

@@ -48,6 +48,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISystemMetricsService, SystemMetricsService>();
 
         services.AddScoped<IDeviceCollectorService, DeviceCollectorService>();
+        services.AddSingleton<IAutoUpdateService, AutoUpdateService>();
         services.AddScoped<IHeartbeatService, HeartbeatService>();
 
         // Executes software-management commands (uninstall/install/update).
