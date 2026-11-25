@@ -4,7 +4,7 @@
 ; Build (from the repository root):
 ;   1. dotnet publish EMS.Agent -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ;   2. "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\EMS.Agent.iss
-;   -> installer\output\TheLanceEMSSetup-<version>.exe
+;   -> installer\output\TheLanceEMSSetup.exe
 ; ------------------------------------------------------------------
 
 #define MyAppName "The Lance Endpoint"
@@ -23,7 +23,7 @@
 ; Version is read from the compiled agent (stamped from EMS.Agent.csproj <Version>),
 ; so the installer, the Add/Remove Programs entry, and the version the agent
 ; reports to the console all come from one source and can never drift. The 4-part
-; file version (e.g. "1.0.17.0") is trimmed to 3 parts for clean filenames.
+; file version (e.g. "1.0.17.0") is trimmed to 3 parts.
 #define AgentExePath AddBackslash(PublishDir) + MyAppExeName
 #define FullAgentVersion GetVersionNumbersString(AgentExePath)
 #define MyAppVersion Copy(FullAgentVersion, 1, RPos(".", FullAgentVersion) - 1)
@@ -46,7 +46,7 @@ DisableDirPage=yes
 ; "Install" (there is no separate Ready/confirmation page).
 DisableReadyPage=yes
 OutputDir=output
-OutputBaseFilename=TheLanceEMSSetup-{#MyAppVersion}
+OutputBaseFilename=TheLanceEMSSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin

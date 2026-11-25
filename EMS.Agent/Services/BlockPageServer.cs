@@ -155,7 +155,7 @@ $@"<!doctype html><html><head><meta charset=""utf-8""><meta name=""viewport"" co
   <h1 style=""font-size:24px;margin:8px 0 6px"">Internet blocked</h1>
   <p style=""font-size:16px;color:#334155;margin:0 0 24px"">The Lance Endpoint blocked the internet, please login to continue browse.</p>
   <a href=""http://thelance.local/__signin"" style=""display:inline-block;background:#06254b;color:#fff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:12px"">Sign in to continue</a>
-  <p style=""font-size:12px;color:#94a3b8;margin-top:22px"">Enter your employee code and password to restore access.</p>
+  <p style=""font-size:12px;color:#94a3b8;margin-top:22px"">Enter your employee code or email address and password to restore access.</p>
 </div></body></html>";
     }
 }

@@ -51,20 +51,8 @@ if (args.Contains("--login"))
     var activationStore = loginHost.Services.GetRequiredService<IActivationStore>();
 
     ApplicationConfiguration.Initialize();
-    var enrolledEmployee = activationStore.ActivatedBy();
-    if (activationStore.IsActivated() && !string.IsNullOrWhiteSpace(enrolledEmployee))
-    {
-        // Already enrolled -> per-startup re-auth asks for the password only.
-        // The employee code and tenant license are remembered from the first
-        // activation; a correct password re-records this boot and unblocks the net.
-        System.Windows.Forms.Application.Run(
-            new SessionLoginForm(loginService, enrolledEmployee!, activationStore.LicenseKey() ?? string.Empty));
-    }
-    else
-    {
-        // First activation after install: license key -> employee code + password.
-        System.Windows.Forms.Application.Run(new LicenseActivationForm(licenseService, loginService));
-    }
+    System.Windows.Forms.Application.Run(
+        LoginWindowFactory.Create(activationStore, licenseService, loginService, LicenseKeyFile.Read()));
     // Hold the single-instance lock until the window closes (released on exit).
     GC.KeepAlive(activationLock);
     return;

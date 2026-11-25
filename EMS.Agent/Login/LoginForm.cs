@@ -1,163 +1,46 @@
 using System.Runtime.Versioning;
-using EMS.Agent.Branding;
 using EMS.Agent.Services;
 
 namespace EMS.Agent.Login;
 
 /// <summary>
-/// Activation login window shown after install. Collects EMS credentials,
-/// verifies them against the server, and on success activates the device so
-/// the background service begins working. The window keeps no state beyond
-/// the fields; all logic lives in <see cref="IActivationLoginService"/>.
+/// Activation login window shown after install. Collects EMS credentials
+/// (employee code or email address and password), verifies them against the
+/// server, and on success activates the device so the background service begins
+/// working. The window keeps no state beyond the fields; all logic lives in
+/// <see cref="IActivationLoginService"/>.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class LoginForm : Form
 {
-    private readonly IActivationLoginService _loginService;
-    private readonly string _licenseKey;
-
-    private readonly TextField _employeeCodeField;
-    private readonly TextField _passwordField;
-    private readonly Label _statusLabel;
-    private readonly Button _activateButton;
+    private readonly EmployeeSignInCard _card;
 
     public LoginForm(IActivationLoginService loginService, string licenseKey, string? tenantName = null)
     {
-        _loginService = loginService;
-        _licenseKey = licenseKey;
+        var subheading = string.IsNullOrWhiteSpace(tenantName)
+            ? "Use your employee code or email address and password."
+            : $"Tenant: {tenantName}. Use your employee code or email address.";
 
-        Text = "The Lance Endpoint — Activation";
-        try { Icon = BrandingAssets.AppIcon(); } catch { /* non-fatal */ }
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        StartPosition = FormStartPosition.CenterScreen;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        ClientSize = new Size(380, 260);
-        Font = new Font("Segoe UI", 9F);
-
-        var heading = new Label
-        {
-            Text = "Sign in to activate",
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            AutoSize = true,
-            Location = new Point(20, 18),
-        };
-
-        var subheading = new Label
-        {
-            Text = string.IsNullOrWhiteSpace(tenantName)
-                ? "Use your employee account."
-                : $"Tenant: {tenantName}. Use your employee account.",
-            ForeColor = SystemColors.GrayText,
-            AutoSize = true,
-            Location = new Point(20, 46),
-        };
-
-        _employeeCodeField = new TextField("Employee code", new Point(20, 78), passwordChar: '\0');
-        _passwordField = new TextField("Password", new Point(20, 128), passwordChar: '●');
-
-        _statusLabel = new Label
-        {
-            AutoSize = false,
-            Location = new Point(20, 172),
-            Size = new Size(340, 20),
-            ForeColor = Color.Firebrick,
-        };
-
-        _activateButton = new Button
-        {
-            Text = "Activate",
-            Location = new Point(20, 198),
-            Size = new Size(340, 36),
-            FlatStyle = FlatStyle.System,
-        };
-        _activateButton.Click += async (_, _) => await ActivateAsync();
-
-        AcceptButton = _activateButton;
-
-        Controls.Add(heading);
-        Controls.Add(subheading);
-        _employeeCodeField.AddTo(Controls);
-        _passwordField.AddTo(Controls);
-        Controls.Add(_statusLabel);
-        Controls.Add(_activateButton);
-    }
-
-    private async Task ActivateAsync()
-    {
-        SetBusy(true, "Signing in…", Color.DimGray);
-
-        try
-        {
-            var result = await _loginService.LoginAndActivateAsync(
-                _employeeCodeField.Value, _passwordField.Value, _licenseKey);
-
-            if (result.Success)
+        _card = new EmployeeSignInCard(
+            this,
+            loginService,
+            licenseKey,
+            title: "The Lance Endpoint — Activation",
+            headingText: "Sign in to activate",
+            subheadingText: subheading,
+            submitButtonText: "Activate",
+            topMost: false,
+            onSuccess: (card, result) =>
             {
-                _statusLabel.ForeColor = Color.Green;
-                _statusLabel.Text = result.Message;
+                card.SetStatus(result.Message, Color.Green);
                 MessageBox.Show(
                     result.Message + "\n\nThe Lance Endpoint is now active on this device.",
                     "The Lance Endpoint — Activated",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 Close();
-                return;
-            }
-
-            SetBusy(false, result.Message, Color.Firebrick);
-        }
-        catch (Exception ex)
-        {
-            SetBusy(false, "Unexpected error: " + ex.Message, Color.Firebrick);
-        }
+            });
     }
 
-    private void SetBusy(bool busy, string status, Color color)
-    {
-        _activateButton.Enabled = !busy;
-        _employeeCodeField.Enabled = !busy;
-        _passwordField.Enabled = !busy;
-        _statusLabel.ForeColor = color;
-        _statusLabel.Text = status;
-    }
-
-    /// <summary>A label + textbox pair, kept together for tidy layout.</summary>
-    private sealed class TextField
-    {
-        private readonly Label _label;
-        private readonly TextBox _textBox;
-
-        public TextField(string caption, Point location, char passwordChar)
-        {
-            _label = new Label
-            {
-                Text = caption,
-                AutoSize = true,
-                Location = location,
-            };
-            _textBox = new TextBox
-            {
-                Location = new Point(location.X, location.Y + 20),
-                Size = new Size(340, 24),
-            };
-            if (passwordChar != '\0')
-            {
-                _textBox.PasswordChar = passwordChar;
-            }
-        }
-
-        public string Value => _textBox.Text;
-
-        public bool Enabled
-        {
-            set => _textBox.Enabled = value;
-        }
-
-        public void AddTo(Control.ControlCollection controls)
-        {
-            controls.Add(_label);
-            controls.Add(_textBox);
-        }
-    }
+    internal EmployeeSignInCard Card => _card;
 }

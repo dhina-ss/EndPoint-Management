@@ -32,7 +32,7 @@ public class ActivationLoginService : IActivationLoginService
     {
         if (string.IsNullOrWhiteSpace(employeeCode) || string.IsNullOrWhiteSpace(password))
         {
-            return new ActivationLoginResult(false, "Enter your employee code and password.");
+            return new ActivationLoginResult(false, "Enter your employee code or email address and password.");
         }
 
         try
@@ -48,6 +48,23 @@ public class ActivationLoginService : IActivationLoginService
                 new { employeeCode = employeeCode.Trim(), password, deviceId, licenseKey = licenseKey.Trim() },
                 cancellationToken);
 
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                LoginResult? unauthorizedResult = null;
+                try
+                {
+                    unauthorizedResult = await response.Content.ReadFromJsonAsync<LoginResult>(cancellationToken);
+                }
+                catch
+                {
+                    // Non-JSON or empty 401 body; fall through to standard invalid-credentials message.
+                }
+
+                return new ActivationLoginResult(
+                    false,
+                    unauthorizedResult?.Message ?? "Invalid employee code, email address, or password.");
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Login request failed with status {StatusCode}.", (int)response.StatusCode);
@@ -57,7 +74,9 @@ public class ActivationLoginService : IActivationLoginService
             var result = await response.Content.ReadFromJsonAsync<LoginResult>(cancellationToken);
             if (result?.Success != true)
             {
-                return new ActivationLoginResult(false, result?.Message ?? "Invalid username or password.");
+                return new ActivationLoginResult(
+                    false,
+                    result?.Message ?? "Invalid employee code, email address, or password.");
             }
 
             // Store the employee code and license key so the server can map this
