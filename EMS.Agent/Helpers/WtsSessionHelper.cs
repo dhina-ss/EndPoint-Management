@@ -15,14 +15,22 @@ public static class WtsSessionHelper
     private const int WTS_CURRENT_SERVER_HANDLE = 0;
     private const int WTSUserName = 5;
     private const int WTSDomainName = 7;
+    private const int WTSSessionInfoEx = 25;
+    private const int WTS_SESSIONSTATE_LOCK = 0;
+    private const int WTS_SESSIONSTATE_UNLOCK = 1;
 
-    private const uint TOKEN_ALL_ACCESS = 0xF01FF;
+    private const uint MAXIMUM_ALLOWED = 0x02000000;
     private const int SecurityImpersonation = 2;
     private const int TokenPrimary = 1;
     private const uint CREATE_NO_WINDOW = 0x08000000;
     private const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
 
     public sealed record ActiveSession(int SessionId, string? Username);
+
+    public sealed record SessionExtendedState(
+        bool? IsLocked,
+        bool IsRemote,
+        int? IdleSeconds);
 
     public static IReadOnlyList<ActiveSession> GetActiveUserSessions()
     {
@@ -79,7 +87,7 @@ public static class WtsSessionHelper
             }
 
             var sa = new SECURITY_ATTRIBUTES { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
-            if (!DuplicateTokenEx(userToken, TOKEN_ALL_ACCESS, ref sa, SecurityImpersonation, TokenPrimary, out primaryToken))
+            if (!DuplicateTokenEx(userToken, MAXIMUM_ALLOWED, ref sa, SecurityImpersonation, TokenPrimary, out primaryToken))
             {
                 logger.LogWarning(new Win32Exception(Marshal.GetLastWin32Error()),
                     "DuplicateTokenEx failed for session {SessionId}.", sessionId);
@@ -131,6 +139,151 @@ public static class WtsSessionHelper
             if (primaryToken != IntPtr.Zero) CloseHandle(primaryToken);
             if (userToken != IntPtr.Zero) CloseHandle(userToken);
         }
+    }
+
+    /// <summary>
+    /// Queries extended Windows Terminal Services state (real kernel lock flag,
+    /// RDP remote indicator, and RDP idle time) for <paramref name="sessionId"/>.
+    /// </summary>
+    public static SessionExtendedState? GetSessionExtendedState(int sessionId)
+    {
+        if (sessionId <= 0) return null;
+
+        if (!WTSQuerySessionInformationW(IntPtr.Zero, sessionId, WTSSessionInfoEx, out var buffer, out var bytes)
+            || buffer == IntPtr.Zero || bytes < Marshal.SizeOf<WTSINFOEXW>())
+        {
+            if (buffer != IntPtr.Zero) WTSFreeMemory(buffer);
+            return null;
+        }
+
+        try
+        {
+            var infoEx = Marshal.PtrToStructure<WTSINFOEXW>(buffer);
+            if (infoEx.Level != 1)
+            {
+                return null;
+            }
+
+            var data = infoEx.Data;
+            bool? isLocked = DecodeLockFlag(data.SessionFlags);
+            if (data.SessionState == WTS_CONNECTSTATE_CLASS.WTSDisconnected)
+            {
+                // Disconnected console/RDP sessions require re-authentication to resume.
+                isLocked = true;
+            }
+            var winStation = data.WinStationName?.Trim() ?? string.Empty;
+            var isRemote = winStation.StartsWith("RDP-", StringComparison.OrdinalIgnoreCase);
+
+            int? idleSeconds = null;
+            // WTSINFOEX_LEVEL1.LastInputTime is reliably updated on RDP sessions (whereas
+            // Console sessions may leave LastInputTime at 0 or stale).
+            if (isRemote && data.LastInputTime > 0 && data.CurrentTime > data.LastInputTime
+                && data.LastInputTime >= data.ConnectTime && data.LastInputTime >= data.LogonTime)
+            {
+                var diffSec = (data.CurrentTime - data.LastInputTime) / 10_000_000L;
+                if (diffSec >= 0 && diffSec <= int.MaxValue)
+                {
+                    idleSeconds = (int)diffSec;
+                }
+            }
+
+            return new SessionExtendedState(isLocked, isRemote, idleSeconds);
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
+
+    public static bool? IsSessionLocked(int sessionId) => GetSessionExtendedState(sessionId)?.IsLocked;
+
+    /// <summary>
+    /// Disconnects a Windows session (use <c>-1</c> for WTS_CURRENT_SESSION or a
+    /// positive session ID when called from the LocalSystem service). On RDP and
+    /// domain-restricted machines this locks the desktop behind the Windows sign-in screen.
+    /// </summary>
+    public static bool DisconnectSession(int sessionId, ILogger? logger = null)
+    {
+        try
+        {
+            if (WTSDisconnectSession(IntPtr.Zero, sessionId, false))
+            {
+                logger?.LogInformation("Disconnected/locked Windows session {SessionId} via WTSDisconnectSession.", sessionId);
+                return true;
+            }
+
+            var err = Marshal.GetLastWin32Error();
+            logger?.LogWarning("WTSDisconnectSession failed for session {SessionId} (Win32 error {Error}).", sessionId, err);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "WTSDisconnectSession threw for session {SessionId}.", sessionId);
+            return false;
+        }
+    }
+
+    public static bool RequestServiceLock(int sessionId, ILogger? logger = null)
+    {
+        if (sessionId <= 0) return false;
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "EMS.Agent", "lock-requests");
+            Directory.CreateDirectory(dir);
+            var flagPath = Path.Combine(dir, $"session-{sessionId}.flag");
+            File.WriteAllText(flagPath, DateTime.UtcNow.ToString("O"));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "Could not write service lock-request for session {SessionId}.", sessionId);
+            return false;
+        }
+    }
+
+    public static IReadOnlyList<int> ConsumePendingLockRequests(ILogger? logger = null)
+    {
+        var sessions = new List<int>();
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "EMS.Agent", "lock-requests");
+            if (!Directory.Exists(dir)) return sessions;
+
+            foreach (var file in Directory.GetFiles(dir, "session-*.flag"))
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                if (name.StartsWith("session-", StringComparison.OrdinalIgnoreCase)
+                    && int.TryParse(name.AsSpan("session-".Length), out var sid)
+                    && sid > 0)
+                {
+                    sessions.Add(sid);
+                }
+
+                try { File.Delete(file); } catch { /* best effort */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "Could not read pending lock requests.");
+        }
+
+        return sessions;
+    }
+
+    private static bool? DecodeLockFlag(int sessionFlags)
+    {
+        var inverted = !OperatingSystem.IsWindowsVersionAtLeast(6, 2);
+        if (sessionFlags == WTS_SESSIONSTATE_LOCK) return !inverted;
+        if (sessionFlags == WTS_SESSIONSTATE_UNLOCK) return inverted;
+        return null;
     }
 
     private static string? QuerySessionString(int sessionId, int infoClass)
@@ -213,6 +366,38 @@ public static class WtsSessionHelper
         public int dwThreadId;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WTSINFOEX_LEVEL1
+    {
+        public uint SessionId;
+        public WTS_CONNECTSTATE_CLASS SessionState;
+        public int SessionFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 33)]
+        public string WinStationName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 21)]
+        public string UserName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 18)]
+        public string DomainName;
+        public long LogonTime;
+        public long ConnectTime;
+        public long DisconnectTime;
+        public long LastInputTime;
+        public long CurrentTime;
+        public uint IncomingBytes;
+        public uint OutgoingBytes;
+        public uint IncomingFrames;
+        public uint OutgoingFrames;
+        public uint IncomingCompressedBytes;
+        public uint OutgoingCompressedBytes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WTSINFOEXW
+    {
+        public uint Level;
+        public WTSINFOEX_LEVEL1 Data;
+    }
+
     [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool WTSEnumerateSessionsW(
         IntPtr hServer, int reserved, int version, out IntPtr ppSessionInfo, out int pCount);
@@ -220,6 +405,10 @@ public static class WtsSessionHelper
     [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool WTSQuerySessionInformationW(
         IntPtr hServer, int sessionId, int wtsInfoClass, out IntPtr ppBuffer, out int pBytesReturned);
+
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSDisconnectSession(
+        IntPtr hServer, int sessionId, [MarshalAs(UnmanagedType.Bool)] bool bWait);
 
     [DllImport("wtsapi32.dll", SetLastError = true)]
     private static extern bool WTSQueryUserToken(int sessionId, out IntPtr phToken);

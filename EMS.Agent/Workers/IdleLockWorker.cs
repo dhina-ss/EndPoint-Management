@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using EMS.Agent.Helpers;
 using EMS.Agent.Services;
 
 namespace EMS.Agent.Workers;
@@ -88,20 +90,25 @@ public sealed class IdleLockWorker : BackgroundService
             return;
         }
 
+        var sessionId = Process.GetCurrentProcess().SessionId;
         var alertSeconds = _policyStore.InactivityAlertSeconds();
         var idleSeconds = GetIdleSeconds();
-        var isLocked = _sessionState.IsLocked;
+        var isLocked = WtsSessionHelper.IsSessionLocked(sessionId) ?? _sessionState.IsLocked;
 
         if (!_autoLocked)
         {
             if (!isLocked && idleSeconds >= lockSeconds)
             {
-                _logger.LogInformation("Idle {Idle}s >= {Threshold}s; locking workstation.", idleSeconds, lockSeconds);
-                LockWorkStation();
-                _autoLocked = true;
-                _alerted = false;
-                _autoLockedAtUtc = DateTime.UtcNow;
-                await BeaconAsync(idleLock: true, cancellationToken);
+                _logger.LogInformation(
+                    "Idle {Idle}s >= {Threshold}s (session {SessionId}); locking workstation.",
+                    idleSeconds, lockSeconds, sessionId);
+                if (await TryLockSessionAsync(sessionId, cancellationToken))
+                {
+                    _autoLocked = true;
+                    _alerted = false;
+                    _autoLockedAtUtc = DateTime.UtcNow;
+                    await BeaconAsync(idleLock: true, cancellationToken);
+                }
             }
             return;
         }
@@ -148,6 +155,46 @@ public sealed class IdleLockWorker : BackgroundService
         {
             _logger.LogDebug(ex, "Idle beacon ({Kind}) failed.", idleLock ? "lock" : "alert");
         }
+    }
+
+    private async Task<bool> TryLockSessionAsync(int sessionId, CancellationToken cancellationToken)
+    {
+        var apiOk = LockWorkStation();
+        var err = apiOk ? 0 : Marshal.GetLastWin32Error();
+        if (!apiOk)
+        {
+            _logger.LogWarning("LockWorkStation returned false (Win32 error {Error}) in session {SessionId}; attempting WTS disconnect fallback.",
+                err, sessionId);
+        }
+
+        // Give Windows a brief moment to switch desktops and update WTSSessionInfoEx lock flags.
+        await Task.Delay(TimeSpan.FromMilliseconds(1200), cancellationToken);
+        var kernelLocked = WtsSessionHelper.IsSessionLocked(sessionId);
+        if (kernelLocked == true)
+        {
+            return true;
+        }
+
+        // In RDP / Windows Server domain sessions or under DisableLockWorkstation GPO,
+        // LockWorkStation can return false or leave the session unlocked. Disconnecting
+        // the session locks it behind the Windows sign-in screen.
+        if (!apiOk || kernelLocked == false)
+        {
+            if (WtsSessionHelper.DisconnectSession(-1, _logger))
+            {
+                return true;
+            }
+
+            // Standard domain user may lack permission to disconnect their own RDP session;
+            // hand off to the LocalSystem service watchdog.
+            if (WtsSessionHelper.RequestServiceLock(sessionId, _logger))
+            {
+                _logger.LogInformation("Requested LocalSystem service to lock/disconnect session {SessionId}.", sessionId);
+                return true;
+            }
+        }
+
+        return apiOk;
     }
 
     private bool MonitoringActive()

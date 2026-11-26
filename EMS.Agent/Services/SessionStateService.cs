@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Runtime.Versioning;
+using EMS.Agent.Helpers;
 using Microsoft.Win32;
 
 namespace EMS.Agent.Services;
@@ -34,12 +36,19 @@ public sealed class SessionStateService : ISessionStateService, IDisposable
         switch (e.Reason)
         {
             case SessionSwitchReason.SessionLock:
+            case SessionSwitchReason.RemoteDisconnect:
+            case SessionSwitchReason.ConsoleDisconnect:
                 _isLocked = true;
-                _logger.LogInformation("Session locked; work timer paused.");
+                _logger.LogInformation("Session locked/disconnected ({Reason}); work timer paused.", e.Reason);
                 break;
             case SessionSwitchReason.SessionUnlock:
                 _isLocked = false;
                 _logger.LogInformation("Session unlocked; work timer resumed.");
+                break;
+            case SessionSwitchReason.RemoteConnect:
+            case SessionSwitchReason.ConsoleConnect:
+                _isLocked = WtsSessionHelper.IsSessionLocked(Process.GetCurrentProcess().SessionId) ?? false;
+                _logger.LogInformation("Session connected ({Reason}, locked={Locked}).", e.Reason, _isLocked);
                 break;
         }
     }

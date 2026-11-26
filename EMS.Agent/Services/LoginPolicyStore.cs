@@ -76,7 +76,8 @@ public class LoginPolicyStore : ILoginPolicyStore
                 return null;
             }
 
-            return JsonSerializer.Deserialize<LoginPolicyDocument>(File.ReadAllText(_filePath));
+            using var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            return JsonSerializer.Deserialize<LoginPolicyDocument>(fs);
         }
         catch (Exception ex)
         {
