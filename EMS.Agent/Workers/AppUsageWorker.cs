@@ -53,6 +53,7 @@ public class AppUsageWorker : BackgroundService
 
         // Fire the sleep beacon when the machine suspends (best-effort).
         _sessionState.Suspending += OnSuspending;
+        _sessionState.Resumed += OnResumed;
 
         try
         {
@@ -86,6 +87,7 @@ public class AppUsageWorker : BackgroundService
         finally
         {
             _sessionState.Suspending -= OnSuspending;
+            _sessionState.Resumed -= OnResumed;
             _logger.LogInformation("App usage worker stopped.");
         }
     }
@@ -112,6 +114,24 @@ public class AppUsageWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Suspend beacon failed.");
+            }
+        });
+    }
+
+    private void OnResumed()
+    {
+        // Fire resume beacon when the machine wakes from sleep
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+                await apiClient.SendPowerStateAsync(suspended: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Resume beacon failed.");
             }
         });
     }

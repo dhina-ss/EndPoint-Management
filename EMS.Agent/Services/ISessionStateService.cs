@@ -12,4 +12,7 @@ public interface ISessionStateService
 
     /// <summary>Raised just before the machine suspends (sleep/hibernate).</summary>
     event Action? Suspending;
+
+    /// <summary>Raised when the machine resumes from sleep/hibernate.</summary>
+    event Action? Resumed;
 }

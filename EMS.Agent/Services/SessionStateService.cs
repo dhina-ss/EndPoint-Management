@@ -27,6 +27,7 @@ public sealed class SessionStateService : ISessionStateService, IDisposable
     public bool IsLocked => _isLocked;
 
     public event Action? Suspending;
+    public event Action? Resumed;
 
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
     {
@@ -55,6 +56,18 @@ public sealed class SessionStateService : ISessionStateService, IDisposable
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Suspend handler threw.");
+            }
+        }
+        else if (e.Mode == PowerModes.Resume)
+        {
+            _logger.LogInformation("Machine resuming; signalling wake.");
+            try
+            {
+                Resumed?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Resume handler threw.");
             }
         }
     }
