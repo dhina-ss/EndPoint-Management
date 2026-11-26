@@ -89,6 +89,11 @@ Name: "{group}\Activate {#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parame
 Name: "{group}\Unlock Microsoft Store"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--unlock-store"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
+[Registry]
+; Start the per-user usage & location tracker automatically when ANY user signs in
+; (so multi-user PCs or IT-installed standard-user machines always run LocationWorker).
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "TheLanceEndpointTracker"; ValueData: """{app}\{#MyAppExeName}"" --usage-tracker"; Flags: uninsdeletevalue
+
 [Run]
 ; Reset the data folder's ACL so the Users group can modify EXISTING files too
 ; (the [Dirs] grant only covers the folder and new children). Fixes an
@@ -100,6 +105,8 @@ Filename: "{sys}\sc.exe"; Parameters: "description {#MyServiceName} ""Collects d
 ; Restart automatically if the service ever crashes (3 restarts, 1 min apart, reset counter daily).
 Filename: "{sys}\sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden
+; Launch the per-user usage/location tracker immediately in the interactive user's session.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--usage-tracker"; Flags: nowait runasoriginaluser skipifsilent
 ; Open the activation login window immediately after install. postinstall +
 ; nowait so setup finishes; skipifsilent so unattended installs are not
 ; blocked waiting on a person. The service stays dormant until this sign-in.
@@ -206,9 +213,22 @@ end;
 procedure RegisterUsageTrackerTask();
 var
   ResultCode: Integer;
-  TaskCommand, XmlContent: string;
+  CurrentUser, CurrentDomain, FullUserId, TaskCommand, XmlContent: string;
   XmlPathAnsi, XmlPath, ReencodeScript: string;
 begin
+  CurrentUser := GetEnv('USERNAME');
+  if (CurrentUser = '') or (UpperCase(CurrentUser) = 'SYSTEM') or (CurrentUser[Length(CurrentUser)] = '$') then
+  begin
+    Log('Skipping user-specific usage-tracker task (non-interactive account); HKLM\Run handles interactive logins.');
+    Exit;
+  end;
+
+  CurrentDomain := GetEnv('USERDOMAIN');
+  if CurrentDomain <> '' then
+    FullUserId := CurrentDomain + '\' + CurrentUser
+  else
+    FullUserId := CurrentUser;
+
   // Built as a Scheduled Task XML definition rather than the flat
   // "schtasks /TR <string>" form: /TR requires the caller to correctly
   // nest quotes around a path that itself contains spaces, which is
@@ -221,11 +241,12 @@ begin
     '  <Triggers>' + #13#10 +
     '    <LogonTrigger>' + #13#10 +
     '      <Enabled>true</Enabled>' + #13#10 +
+    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
     '    </LogonTrigger>' + #13#10 +
     '  </Triggers>' + #13#10 +
     '  <Principals>' + #13#10 +
     '    <Principal id="Author">' + #13#10 +
-    '      <GroupId>S-1-5-32-545</GroupId>' + #13#10 +
+    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
     '      <LogonType>InteractiveToken</LogonType>' + #13#10 +
     '      <RunLevel>LeastPrivilege</RunLevel>' + #13#10 +
     '    </Principal>' + #13#10 +

@@ -158,6 +158,14 @@ if (args.Contains("--usage-tracker"))
     // console, so detach it immediately - nothing is lost.
     ConsoleWindowHelper.DetachConsole();
 
+    // Ensure only one usage-tracker / location-worker runs per user session
+    // even when started by both HKLM\Run and the Scheduled Task or installer.
+    using var trackerMutex = new Mutex(false, @"Local\TheLanceEMS.UsageTracker", out bool isFirstTracker);
+    if (!isFirstTracker)
+    {
+        return;
+    }
+
     var trackerBuilder = Host.CreateApplicationBuilder(args);
 
     // Writing to the Windows Event Log from this non-elevated, per-user

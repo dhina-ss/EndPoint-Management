@@ -28,12 +28,34 @@ public static class GpsLocationHelper
             var locator = new Geolocator
             {
                 DesiredAccuracy = PositionAccuracy.High,
-                DesiredAccuracyInMeters = 50
+                DesiredAccuracyInMeters = 100
             };
 
-            // Accept a position up to 5 min old; wait up to 20s for a fresh fix.
-            var position = await locator.GetGeopositionAsync(
-                TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(20)).AsTask(cancellationToken);
+            // Accept a position up to 5 min old; try 100m accuracy first (12s),
+            // then fall back to Default/500m (15s) for indoor Wi-Fi setups where
+            // router triangulation has >100m uncertainty.
+            Geoposition? position = null;
+            try
+            {
+                position = await locator.GetGeopositionAsync(
+                    TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(12)).AsTask(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogInformation("High-accuracy GPS read timed out/failed ({Msg}); retrying with Default Wi-Fi accuracy.", ex.Message);
+                var fallbackLocator = new Geolocator
+                {
+                    DesiredAccuracy = PositionAccuracy.Default,
+                    DesiredAccuracyInMeters = 500
+                };
+                position = await fallbackLocator.GetGeopositionAsync(
+                    TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(15)).AsTask(cancellationToken);
+            }
+
+            if (position is null)
+            {
+                return null;
+            }
 
             // If Windows only has an IP-derived location (no GPS/Wi-Fi/cell fix),
             // let the server handle IP geolocation so it isn't mislabeled as GPS.

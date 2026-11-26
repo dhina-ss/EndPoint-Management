@@ -86,6 +86,7 @@ public class WorkTimeTrackerTests
     {
         public bool IsLocked { get; set; }
         public event Action? Suspending { add { } remove { } }
+        public event Action? Resumed { add { } remove { } }
     }
 
     private sealed class FakeClock : TimeProvider
