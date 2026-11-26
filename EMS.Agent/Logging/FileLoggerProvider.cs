@@ -18,7 +18,14 @@ public sealed class FileLoggerProvider : ILoggerProvider
     public FileLoggerProvider(string filePath)
     {
         _filePath = filePath;
-        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-admin domain accounts may lack ProgramData ACLs temporarily; Log() falls back to LocalAppData.
+        }
     }
 
     public ILogger CreateLogger(string categoryName)
@@ -63,6 +70,22 @@ public sealed class FileLoggerProvider : ILoggerProvider
                 try
                 {
                     File.AppendAllText(_filePath, line + Environment.NewLine);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    try
+                    {
+                        var fallbackDir = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "EMS.Agent");
+                        Directory.CreateDirectory(fallbackDir);
+                        var fallbackPath = Path.Combine(fallbackDir, Path.GetFileName(_filePath));
+                        File.AppendAllText(fallbackPath, line + Environment.NewLine);
+                    }
+                    catch
+                    {
+                        // Best-effort diagnostic logging must never crash the app.
+                    }
                 }
                 catch
                 {

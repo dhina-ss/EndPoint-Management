@@ -296,6 +296,36 @@ public class ApiClientService : IApiClientService
     public Task SendIdleAlertAsync(CancellationToken cancellationToken = default) =>
         SendDeviceBeaconAsync(_settings.IdleAlertEndpoint, "idle-alert", cancellationToken);
 
+    public async Task SendSessionEventAsync(
+        string eventType, string? detail = null, CancellationToken cancellationToken = default)
+    {
+        var token = await _tokenService.GetTokenAsync(cancellationToken);
+        if (token is null)
+        {
+            return;
+        }
+
+        var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _settings.SessionEventEndpoint)
+            {
+                Content = JsonContent.Create(new { type = eventType, detail })
+            };
+            request.Headers.Add(DeviceAuthHeaders.DeviceId, deviceId);
+            request.Headers.Add(DeviceAuthHeaders.Token, token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            _logger.LogDebug("Session-event beacon sent ({EventType}): {Status}.",
+                eventType, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Session-event beacon ({EventType}) could not be delivered.", eventType);
+        }
+    }
+
     /// <summary>Shared plumbing for the fire-and-forget device-token beacons.</summary>
     private async Task SendDeviceBeaconAsync(string endpoint, string label, CancellationToken cancellationToken)
     {

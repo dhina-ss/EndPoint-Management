@@ -84,6 +84,9 @@ public class ApiSettings
     /// <summary>Relative path of the power-state (sleep) beacon endpoint.</summary>
     public string PowerStateEndpoint { get; set; } = "/api/devices/power-state";
 
+    /// <summary>Relative path of the session lifecycle event endpoint (login/logoff/lock/unlock).</summary>
+    public string SessionEventEndpoint { get; set; } = "/api/devices/session-event";
+
     /// <summary>Relative path of the inactivity auto-lock beacon endpoint.</summary>
     public string IdleLockEndpoint { get; set; } = "/api/devices/idle-lock";
 

@@ -40,6 +40,9 @@ public interface IApiClientService
     /// </summary>
     Task SendPowerStateAsync(bool suspended, CancellationToken cancellationToken = default);
 
+    /// <summary>Best-effort session lifecycle beacon (login, logoff, lock, unlock).</summary>
+    Task SendSessionEventAsync(string eventType, string? detail = null, CancellationToken cancellationToken = default);
+
     /// <summary>Best-effort beacon that the workstation was auto-locked after inactivity.</summary>
     Task SendIdleLockAsync(CancellationToken cancellationToken = default);
 

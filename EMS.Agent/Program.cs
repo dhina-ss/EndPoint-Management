@@ -195,15 +195,26 @@ if (args.Contains("--usage-tracker"))
 
 var builder = Host.CreateApplicationBuilder(args);
 
+if (OperatingSystem.IsWindows())
+{
+    EMS.Agent.Helpers.ProgramDataPermissions.EnsureUserWritable();
+}
+
 // Runs as a Windows Service when installed via sc.exe; runs as a console app otherwise.
 builder.Services.AddWindowsService(options =>
 {
     options.ServiceName = "EMS Endpoint Agent";
 });
 
+if (Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
+{
+    builder.Services.AddSingleton<Microsoft.Extensions.Hosting.IHostLifetime, EMS.Agent.Services.EmsWindowsServiceLifetime>();
+}
+
 builder.Services.AddAgentServices(builder.Configuration);
 builder.Services.AddHostedService<AgentWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
+builder.Services.AddHostedService<EMS.Agent.Workers.SessionWatchdogWorker>();
 // Software-management command queue runs only in the SYSTEM service, which has
 // the rights to install/uninstall machine-wide software.
 builder.Services.AddHostedService<CommandWorker>();
