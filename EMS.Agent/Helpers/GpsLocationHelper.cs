@@ -25,15 +25,31 @@ public static class GpsLocationHelper
                 return null;
             }
 
-            var locator = new Geolocator { DesiredAccuracyInMeters = 50 };
+            var locator = new Geolocator
+            {
+                DesiredAccuracy = PositionAccuracy.High,
+                DesiredAccuracyInMeters = 50
+            };
 
             // Accept a position up to 5 min old; wait up to 20s for a fresh fix.
-            var position = await locator.GetGeopositionAsync(TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(20));
+            var position = await locator.GetGeopositionAsync(
+                TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(20)).AsTask(cancellationToken);
+
+            // If Windows only has an IP-derived location (no GPS/Wi-Fi/cell fix),
+            // let the server handle IP geolocation so it isn't mislabeled as GPS.
+            if (position.Coordinate.PositionSource == PositionSource.IPAddress)
+            {
+                logger.LogInformation(
+                    "Windows location source is IPAddress (±{Accuracy}m); deferring to server IP location.",
+                    position.Coordinate.Accuracy);
+                return null;
+            }
+
             var point = position.Coordinate.Point.Position;
 
             logger.LogInformation(
-                "GPS location acquired: {Lat}, {Lon} (±{Accuracy}m).",
-                point.Latitude, point.Longitude, position.Coordinate.Accuracy);
+                "GPS location acquired ({Source}): {Lat}, {Lon} (±{Accuracy}m).",
+                position.Coordinate.PositionSource, point.Latitude, point.Longitude, position.Coordinate.Accuracy);
 
             return new GpsReading(point.Latitude, point.Longitude, position.Coordinate.Accuracy);
         }
