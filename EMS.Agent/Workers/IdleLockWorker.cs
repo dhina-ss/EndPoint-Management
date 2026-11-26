@@ -32,6 +32,7 @@ public sealed class IdleLockWorker : BackgroundService
 
     private bool _autoLocked;
     private bool _alerted;
+    private bool _wasLocked;
     private DateTime _autoLockedAtUtc;
 
     public IdleLockWorker(
@@ -95,6 +96,15 @@ public sealed class IdleLockWorker : BackgroundService
         var idleSeconds = GetIdleSeconds();
         var isLocked = WtsSessionHelper.IsSessionLocked(sessionId) ?? _sessionState.IsLocked;
 
+        // Notify the server immediately whenever a locked session unlocks/wakes so
+        // LockedAt/SuspendedAt clear without waiting for the server freshness timeout.
+        if (_wasLocked && !isLocked)
+        {
+            _logger.LogInformation("Session {SessionId} unlocked/resumed; notifying server.", sessionId);
+            await SendSessionEventAsync("unlock", CurrentDomainUser(), cancellationToken);
+        }
+        _wasLocked = isLocked;
+
         if (!_autoLocked)
         {
             if (!isLocked && idleSeconds >= lockSeconds)
@@ -106,6 +116,7 @@ public sealed class IdleLockWorker : BackgroundService
                 {
                     _autoLocked = true;
                     _alerted = false;
+                    _wasLocked = true;
                     _autoLockedAtUtc = DateTime.UtcNow;
                     await BeaconAsync(idleLock: true, cancellationToken);
                 }
@@ -156,6 +167,25 @@ public sealed class IdleLockWorker : BackgroundService
             _logger.LogDebug(ex, "Idle beacon ({Kind}) failed.", idleLock ? "lock" : "alert");
         }
     }
+
+    private async Task SendSessionEventAsync(string eventType, string? detail, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+            await apiClient.SendSessionEventAsync(eventType, detail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Idle-lock session event ({Type}) failed.", eventType);
+        }
+    }
+
+    private static string CurrentDomainUser() =>
+        string.IsNullOrWhiteSpace(Environment.UserDomainName)
+            ? Environment.UserName
+            : $@"{Environment.UserDomainName}\{Environment.UserName}";
 
     private async Task<bool> TryLockSessionAsync(int sessionId, CancellationToken cancellationToken)
     {

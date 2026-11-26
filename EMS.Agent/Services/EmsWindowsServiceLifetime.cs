@@ -42,16 +42,35 @@ public sealed class EmsWindowsServiceLifetime : WindowsServiceLifetime
         if (powerStatus == PowerBroadcastStatus.Suspend)
         {
             _logger.LogInformation("SCM power suspend event; reporting sleep.");
-            DispatchPowerState(suspended: true);
+            // Give the sleep beacon up to 1.5s to flush before Windows freezes the NIC.
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(1500));
+                SendPowerStateOnceAsync(suspended: true, cts.Token).Wait(1600);
+            }
+            catch { /* best effort before suspend */ }
         }
         else if (powerStatus == PowerBroadcastStatus.ResumeSuspend ||
                  powerStatus == PowerBroadcastStatus.ResumeAutomatic)
         {
             _logger.LogInformation("SCM power resume event ({Status}); reporting wake.", powerStatus);
-            DispatchPowerState(suspended: false);
+            DispatchWakePowerState();
         }
 
         return base.OnPowerEvent(powerStatus);
+    }
+
+    protected override void OnShutdown()
+    {
+        _logger.LogInformation("SCM shutdown event; reporting shutdown.");
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            SendSessionEventOnceAsync("shutdown", "Windows shutting down", cts.Token).Wait(1800);
+        }
+        catch { /* best effort during shutdown */ }
+
+        base.OnShutdown();
     }
 
     protected override void OnSessionChange(SessionChangeDescription changeDescription)
@@ -72,7 +91,11 @@ public sealed class EmsWindowsServiceLifetime : WindowsServiceLifetime
             SessionChangeReason.SessionLogon => "login",
             SessionChangeReason.SessionLogoff => "logoff",
             SessionChangeReason.SessionLock => "lock",
+            SessionChangeReason.RemoteDisconnect => "lock",
+            SessionChangeReason.ConsoleDisconnect => "lock",
             SessionChangeReason.SessionUnlock => "unlock",
+            SessionChangeReason.RemoteConnect => "unlock",
+            SessionChangeReason.ConsoleConnect => "unlock",
             _ => null
         };
 
@@ -81,7 +104,7 @@ public sealed class EmsWindowsServiceLifetime : WindowsServiceLifetime
             _logger.LogInformation(
                 "SCM session change: {Reason} (session {SessionId}, user {User}).",
                 changeDescription.Reason, sessionId, username ?? "unknown");
-            DispatchSessionEvent(eventType, username);
+            DispatchSessionEvent(eventType, username, retryOnWakeDelay: eventType is "unlock" or "login");
 
             if (changeDescription.Reason == SessionChangeReason.SessionLogoff)
             {
@@ -92,43 +115,62 @@ public sealed class EmsWindowsServiceLifetime : WindowsServiceLifetime
         base.OnSessionChange(changeDescription);
     }
 
-    private void DispatchPowerState(bool suspended)
+    private void DispatchWakePowerState()
     {
         _ = Task.Run(async () =>
         {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
-                if (!activation.IsActivated()) return;
+            await SendPowerStateOnceAsync(suspended: false, CancellationToken.None);
+            // Wi-Fi / domain NIC often reconnects a few seconds after ResumeSuspend;
+            // send a delayed backup beacon (server 30s dedup drops duplicates).
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await SendPowerStateOnceAsync(suspended: false, CancellationToken.None);
+        });
+    }
 
-                var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
-                await apiClient.SendPowerStateAsync(suspended);
-            }
-            catch (Exception ex)
+    private async Task SendPowerStateOnceAsync(bool suspended, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
+            if (!activation.IsActivated()) return;
+
+            var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+            await apiClient.SendPowerStateAsync(suspended, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "SCM power-state report failed.");
+        }
+    }
+
+    private void DispatchSessionEvent(string eventType, string? detail, bool retryOnWakeDelay = false)
+    {
+        _ = Task.Run(async () =>
+        {
+            await SendSessionEventOnceAsync(eventType, detail, CancellationToken.None);
+            if (retryOnWakeDelay)
             {
-                _logger.LogDebug(ex, "SCM power-state report failed.");
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                await SendSessionEventOnceAsync(eventType, detail, CancellationToken.None);
             }
         });
     }
 
-    private void DispatchSessionEvent(string eventType, string? detail)
+    private async Task SendSessionEventOnceAsync(string eventType, string? detail, CancellationToken cancellationToken)
     {
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
-                if (!activation.IsActivated()) return;
+            using var scope = _scopeFactory.CreateScope();
+            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
+            if (!activation.IsActivated()) return;
 
-                var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
-                await apiClient.SendSessionEventAsync(eventType, detail);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "SCM session-event ({Type}) report failed.", eventType);
-            }
-        });
+            var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+            await apiClient.SendSessionEventAsync(eventType, detail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "SCM session-event ({Type}) report failed.", eventType);
+        }
     }
 }

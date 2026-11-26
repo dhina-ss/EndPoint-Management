@@ -22,6 +22,8 @@ public class SessionWatchdogWorker : BackgroundService
     private readonly IActivationGate _gate;
     private readonly ILogger<SessionWatchdogWorker> _logger;
     private readonly HashSet<int> _rdpAutoLockedSessions = new();
+    private readonly Dictionary<int, bool> _sessionLockedStates = new();
+    private readonly Dictionary<int, string?> _sessionUsernames = new();
 
     public SessionWatchdogWorker(
         IServiceScopeFactory scopeFactory,
@@ -97,20 +99,44 @@ public class SessionWatchdogWorker : BackgroundService
             }
 
             var activeSessions = WtsSessionHelper.GetActiveUserSessions();
-            if (activeSessions.Count == 0)
-            {
-                _rdpAutoLockedSessions.Clear();
-                return;
-            }
-
             var activeIds = activeSessions.Select(s => s.SessionId).ToHashSet();
             _rdpAutoLockedSessions.RemoveWhere(id => !activeIds.Contains(id));
+
+            // Check any previously tracked sessions that are no longer active (e.g. RDP disconnected/locked).
+            foreach (var knownId in _sessionLockedStates.Keys.ToList())
+            {
+                if (activeIds.Contains(knownId)) continue;
+                var prevExt = WtsSessionHelper.GetSessionExtendedState(knownId);
+                if (prevExt is null)
+                {
+                    _sessionLockedStates.Remove(knownId);
+                    _sessionUsernames.Remove(knownId);
+                    continue;
+                }
+
+                if (prevExt.IsLocked == true && (!_sessionLockedStates.TryGetValue(knownId, out var wasLocked) || !wasLocked))
+                {
+                    _sessionLockedStates[knownId] = true;
+                    _sessionUsernames.TryGetValue(knownId, out var uname);
+                    await SendSessionEventBeaconAsync("lock", uname, cancellationToken);
+                }
+            }
+
+            if (activeSessions.Count == 0)
+            {
+                return;
+            }
 
             var trackerSessions = GetRunningTrackerSessionIds(_logger);
             var lockSeconds = GetLockThresholdSeconds();
 
             foreach (var session in activeSessions)
             {
+                if (!string.IsNullOrWhiteSpace(session.Username))
+                {
+                    _sessionUsernames[session.SessionId] = session.Username;
+                }
+
                 if (!trackerSessions.Contains(session.SessionId))
                 {
                     // Make sure ProgramData ACLs allow the active domain/local user
@@ -123,24 +149,42 @@ public class SessionWatchdogWorker : BackgroundService
                     WtsSessionHelper.LaunchInUserSession(session.SessionId, exePath, "--usage-tracker", _logger);
                 }
 
-                if (lockSeconds > 0)
+                var ext = WtsSessionHelper.GetSessionExtendedState(session.SessionId);
+                if (ext?.IsLocked is bool nowLocked)
                 {
-                    var ext = WtsSessionHelper.GetSessionExtendedState(session.SessionId);
-                    if (ext is { IsRemote: true, IsLocked: false, IdleSeconds: int rdpIdle })
+                    if (_sessionLockedStates.TryGetValue(session.SessionId, out var prevLocked))
                     {
-                        if (rdpIdle < lockSeconds)
-                        {
-                            _rdpAutoLockedSessions.Remove(session.SessionId);
-                        }
-                        else if (rdpIdle >= lockSeconds + 15 && _rdpAutoLockedSessions.Add(session.SessionId))
+                        if (prevLocked && !nowLocked)
                         {
                             _logger.LogInformation(
-                                "RDP domain session {SessionId} ({User}) idle {Idle}s >= {Threshold}s; disconnecting/locking session from service.",
-                                session.SessionId, session.Username ?? "unknown", rdpIdle, lockSeconds);
-                            if (WtsSessionHelper.DisconnectSession(session.SessionId, _logger))
-                            {
-                                await SendIdleLockBeaconAsync(cancellationToken);
-                            }
+                                "Session {SessionId} ({User}) unlocked/resumed; reporting unlock.",
+                                session.SessionId, session.Username ?? "unknown");
+                            await SendSessionEventBeaconAsync("unlock", session.Username, cancellationToken);
+                        }
+                        else if (!prevLocked && nowLocked)
+                        {
+                            await SendSessionEventBeaconAsync("lock", session.Username, cancellationToken);
+                        }
+                    }
+
+                    _sessionLockedStates[session.SessionId] = nowLocked;
+                }
+
+                if (lockSeconds > 0 && ext is { IsRemote: true, IsLocked: false, IdleSeconds: int rdpIdle })
+                {
+                    if (rdpIdle < lockSeconds)
+                    {
+                        _rdpAutoLockedSessions.Remove(session.SessionId);
+                    }
+                    else if (rdpIdle >= lockSeconds + 15 && _rdpAutoLockedSessions.Add(session.SessionId))
+                    {
+                        _logger.LogInformation(
+                            "RDP domain session {SessionId} ({User}) idle {Idle}s >= {Threshold}s; disconnecting/locking session from service.",
+                            session.SessionId, session.Username ?? "unknown", rdpIdle, lockSeconds);
+                        if (WtsSessionHelper.DisconnectSession(session.SessionId, _logger))
+                        {
+                            _sessionLockedStates[session.SessionId] = true;
+                            await SendIdleLockBeaconAsync(cancellationToken);
                         }
                     }
                 }
@@ -180,6 +224,23 @@ public class SessionWatchdogWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Service idle-lock beacon failed.");
+        }
+    }
+
+    private async Task SendSessionEventBeaconAsync(string eventType, string? detail, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var activation = scope.ServiceProvider.GetRequiredService<IActivationStore>();
+            if (!activation.IsActivated()) return;
+
+            var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
+            await apiClient.SendSessionEventAsync(eventType, detail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Service session-event ({EventType}) beacon failed.", eventType);
         }
     }
 
