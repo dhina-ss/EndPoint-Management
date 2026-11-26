@@ -206,22 +206,9 @@ end;
 procedure RegisterUsageTrackerTask();
 var
   ResultCode: Integer;
-  CurrentUser, CurrentDomain, FullUserId, TaskCommand, XmlContent: string;
+  TaskCommand, XmlContent: string;
   XmlPathAnsi, XmlPath, ReencodeScript: string;
 begin
-  CurrentUser := GetEnv('USERNAME');
-  if CurrentUser = '' then
-  begin
-    Log('Skipping usage-tracker task: could not determine the current username.');
-    Exit;
-  end;
-
-  CurrentDomain := GetEnv('USERDOMAIN');
-  if CurrentDomain <> '' then
-    FullUserId := CurrentDomain + '\' + CurrentUser
-  else
-    FullUserId := CurrentUser;
-
   // Built as a Scheduled Task XML definition rather than the flat
   // "schtasks /TR <string>" form: /TR requires the caller to correctly
   // nest quotes around a path that itself contains spaces, which is
@@ -234,12 +221,11 @@ begin
     '  <Triggers>' + #13#10 +
     '    <LogonTrigger>' + #13#10 +
     '      <Enabled>true</Enabled>' + #13#10 +
-    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
     '    </LogonTrigger>' + #13#10 +
     '  </Triggers>' + #13#10 +
     '  <Principals>' + #13#10 +
     '    <Principal id="Author">' + #13#10 +
-    '      <UserId>' + FullUserId + '</UserId>' + #13#10 +
+    '      <GroupId>S-1-5-32-545</GroupId>' + #13#10 +
     '      <LogonType>InteractiveToken</LogonType>' + #13#10 +
     '      <RunLevel>LeastPrivilege</RunLevel>' + #13#10 +
     '    </Principal>' + #13#10 +

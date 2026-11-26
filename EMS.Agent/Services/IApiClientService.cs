@@ -49,8 +49,8 @@ public interface IApiClientService
     /// </summary>
     Task SendIdleAlertAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Reports a precise GPS location fix. Best-effort.</summary>
-    Task SendLocationAsync(double latitude, double longitude, double accuracyMeters,
+    /// <summary>Reports a precise GPS location fix. Returns true if accepted by server.</summary>
+    Task<bool> SendLocationAsync(double latitude, double longitude, double accuracyMeters,
         CancellationToken cancellationToken = default);
 
     /// <summary>

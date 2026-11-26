@@ -18,10 +18,10 @@ public static class GpsLocationHelper
     {
         try
         {
-            var access = await Geolocator.RequestAccessAsync();
+            var access = await RequestAccessSafeAsync(logger, cancellationToken);
             if (access != GeolocationAccessStatus.Allowed)
             {
-                logger.LogInformation("Windows location access is {Status}; using IP location instead.", access);
+                logger.LogWarning("Windows location access is {Status}; check Windows Privacy -> Location settings.", access);
                 return null;
             }
 
@@ -53,11 +53,54 @@ public static class GpsLocationHelper
 
             return new GpsReading(point.Latitude, point.Longitude, position.Coordinate.Accuracy);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "GPS location read failed; falling back to IP location.");
+            logger.LogWarning(ex, "GPS location read failed; falling back to IP location.");
             return null;
         }
+    }
+
+    private static async Task<GeolocationAccessStatus> RequestAccessSafeAsync(
+        ILogger logger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var status = await Geolocator.RequestAccessAsync().AsTask(cancellationToken);
+            if (status != GeolocationAccessStatus.Unspecified)
+            {
+                return status;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogInformation(ex, "Direct Geolocator.RequestAccessAsync failed; retrying on STA thread.");
+        }
+
+        // Some Windows 11 builds require an STA apartment for RequestAccessAsync().
+        var tcs = new TaskCompletionSource<GeolocationAccessStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var status = Geolocator.RequestAccessAsync().AsTask(cancellationToken).GetAwaiter().GetResult();
+                tcs.TrySetResult(status);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "EMS Location Access"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return await tcs.Task.WaitAsync(cancellationToken);
     }
 }
 

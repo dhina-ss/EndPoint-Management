@@ -361,13 +361,14 @@ public class ApiClientService : IApiClientService
         }
     }
 
-    public async Task SendLocationAsync(
+    public async Task<bool> SendLocationAsync(
         double latitude, double longitude, double accuracyMeters, CancellationToken cancellationToken = default)
     {
         var token = await _tokenService.GetTokenAsync(cancellationToken);
         if (token is null)
         {
-            return;
+            _logger.LogInformation("Location report skipped: device token is not available yet.");
+            return false;
         }
 
         var deviceId = await _deviceIdService.GetDeviceIdAsync(cancellationToken);
@@ -385,11 +386,16 @@ public class ApiClientService : IApiClientService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Location report failed with status {StatusCode}.", (int)response.StatusCode);
+                return false;
             }
+
+            _logger.LogInformation("Location uploaded ({Lat}, {Lon}, ±{Accuracy}m).", latitude, longitude, Math.Round(accuracyMeters));
+            return true;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             _logger.LogWarning(ex, "Location report could not reach the EMS server.");
+            return false;
         }
     }
 

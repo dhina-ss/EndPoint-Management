@@ -18,31 +18,63 @@ public class LocationWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ApiSettings _apiSettings;
     private readonly ILogger<LocationWorker> _logger;
+    private readonly ISessionStateService? _sessionState;
+    private readonly SemaphoreSlim _wakeSignal = new(0, 1);
 
     public LocationWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<ApiSettings> apiSettings,
-        ILogger<LocationWorker> logger)
+        ILogger<LocationWorker> logger,
+        ISessionStateService? sessionState = null)
     {
         _scopeFactory = scopeFactory;
         _apiSettings = apiSettings.Value;
         _logger = logger;
+        _sessionState = sessionState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromMinutes(Math.Max(5, _apiSettings.LocationIntervalMinutes));
+        var retryInterval = TimeSpan.FromMinutes(1);
         _logger.LogInformation("Location worker started. Interval: {Minutes} min.", interval.TotalMinutes);
+
+        void OnResumed()
+        {
+            if (_wakeSignal.CurrentCount == 0)
+            {
+                try { _wakeSignal.Release(); } catch { }
+            }
+        }
+
+        if (_sessionState is not null)
+        {
+            _sessionState.Resumed += OnResumed;
+        }
 
         try
         {
-            // Let the session settle before the first fix.
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            // Brief startup delay before first location check.
+            await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
 
+            var hasReported = false;
             while (!stoppingToken.IsCancellationRequested)
             {
-                await ReportLocationAsync(stoppingToken);
-                await Task.Delay(interval, stoppingToken);
+                var sent = await ReportLocationAsync(stoppingToken);
+                if (sent)
+                {
+                    hasReported = true;
+                }
+
+                // If we haven't delivered an initial fix yet (waiting on sign-in, token,
+                // or Wi-Fi settle), retry every 1 minute instead of sleeping 1 hour.
+                var waitTime = hasReported ? interval : retryInterval;
+                var woke = await _wakeSignal.WaitAsync(waitTime, stoppingToken);
+                if (woke)
+                {
+                    // Wait briefly after wake from sleep for Wi-Fi to reconnect.
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -51,11 +83,16 @@ public class LocationWorker : BackgroundService
         }
         finally
         {
+            if (_sessionState is not null)
+            {
+                _sessionState.Resumed -= OnResumed;
+            }
+            _wakeSignal.Dispose();
             _logger.LogInformation("Location worker stopped.");
         }
     }
 
-    private async Task ReportLocationAsync(CancellationToken stoppingToken)
+    private async Task<bool> ReportLocationAsync(CancellationToken stoppingToken)
     {
         try
         {
@@ -66,17 +103,17 @@ public class LocationWorker : BackgroundService
             var gate = scope.ServiceProvider.GetRequiredService<IActivationGate>();
             if (!gate.IsMonitoringActive())
             {
-                return;
+                return false;
             }
 
             var reading = await GpsLocationHelper.TryReadAsync(_logger, stoppingToken);
             if (reading is null)
             {
-                return; // No GPS; the server's IP location stands.
+                return false; // No GPS; the server's IP location stands.
             }
 
             var apiClient = scope.ServiceProvider.GetRequiredService<IApiClientService>();
-            await apiClient.SendLocationAsync(
+            return await apiClient.SendLocationAsync(
                 reading.Latitude, reading.Longitude, reading.AccuracyMeters, stoppingToken);
         }
         catch (OperationCanceledException)
@@ -86,6 +123,7 @@ public class LocationWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Location report cycle failed.");
+            return false;
         }
     }
 }
